@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentbot"
+version = "0.1.0"
+description = "Agentic stack (User Input -> Brain -> Skill Layer -> VLA Execution Engine) for IsaacLab-GR00T, per architecture.png."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "redis>=5.0",
+    "pyyaml>=6.0",
+    "httpx>=0.26",
+]
+
+[project.optional-dependencies]
+# heavy / optional extras (semantic memory). Install with: uv sync --extra vector
+vector = ["chromadb>=0.4"]
+
+# Dev tools (PEP 735). `uv sync` installs these by default; production installs skip them.
+[dependency-groups]
+dev = ["pytest>=7.4", "pytest-asyncio>=0.23", "anyio>=4.0"]
+
+[project.scripts]
+agentbot-api = "agentbot.api.app:main"
+agentbot-worker = "agentbot.vla.worker:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agentbot*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

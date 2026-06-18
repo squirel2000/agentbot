@@ -1,0 +1,12 @@
+# local dev environment
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+.pytest_cache/
+
+# runtime data (sqlite, vector store, logs)
+var/
+
+# local config with secrets / machine-specific paths
+config/agentbot.yaml

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgentBot — console</title>
+<style>
+:root{--bg:#0f1419;--panel:#171d26;--text:#e6edf3;--muted:#8b98a5;--accent:#6ea8fe;
+--border:#2a3441;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--track:#222b36;}
+[data-theme=light]{--bg:#f6f8fa;--panel:#fff;--text:#1f2328;--muted:#656d76;
+--accent:#0969da;--border:#d0d7de;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;--track:#eaeef2;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);
+font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}.sub{color:var(--muted);font-size:13px}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:18px 0 10px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{padding:6px 12px;border-radius:20px;border:1px solid var(--border);font-size:13px;
+background:var(--panel);display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.running .dot,.succeeded .dot{background:var(--ok)}
+.queued .dot{background:var(--warn);animation:pulse 1.2s infinite}
+.failed .dot,.blocked .dot{background:var(--bad)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tabs{display:flex;gap:6px;margin:14px 0}
+.tabs button{background:var(--panel);color:var(--muted);border:1px solid var(--border);
+border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px}
+.tabs button.active{color:var(--text);border-color:var(--accent)}
+.tab{display:none}.tab.active{display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--muted)}
+button.toggle,button.act{background:var(--panel);color:var(--text);border:1px solid var(--border);
+border-radius:8px;padding:7px 11px;cursor:pointer}
+button.act{border-color:var(--accent)}
+canvas{max-height:220px}
+input,select,textarea{background:var(--bg);color:var(--text);border:1px solid var(--border);
+border-radius:8px;padding:8px;font:inherit}
+textarea{width:100%;min-height:54px;resize:vertical}
+.log{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;max-height:260px;overflow:auto}
+.log div{padding:2px 0;border-bottom:1px solid var(--track)}
+.muted{color:var(--muted)}.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.bubble{padding:8px 12px;border-radius:10px;border:1px solid var(--border);margin:6px 0;max-width:80%}
+.bubble.user{margin-left:auto;border-color:var(--accent)}
+.pill{font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid var(--border);color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:680px){.grid2{grid-template-columns:1fr}}
+</style>
+<script src="/vendor/chart.umd.min.js"></script>
+<script>
+(function(){var k='agentbot-theme',t=localStorage.getItem(k)||'dark';
+document.documentElement.setAttribute('data-theme',t);
+window.__toggle=function(){t=t==='dark'?'light':'dark';
+document.documentElement.setAttribute('data-theme',t);localStorage.setItem(k,t);};})();
+</script>
+</head>
+<body><div class="wrap">
+<header>
+  <div><h1>AgentBot — console</h1><div class="sub" id="sub">read-only · connecting…</div></div>
+  <div class="row">
+    <span class="pill" id="connpill">events: …</span>
+    <button class="toggle" onclick="window.__toggle()">◐ theme</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="active" data-tab="monitor">Monitor</button>
+  <button data-tab="chat">Chat</button>
+  <button data-tab="history">History</button>
+  <button data-tab="memory">Memory</button>
+</div>
+
+<!-- ───────────── Monitor (block 3) ───────────── -->
+<section class="tab active" id="tab-monitor">
+  <div class="grid2">
+    <div class="panel"><h2>Live state</h2><div id="state" class="row"></div></div>
+    <div class="panel"><h2>VLA telemetry</h2><canvas id="chart"></canvas></div>
+  </div>
+  <div class="panel"><h2>Active VLA tasks</h2><div id="tasks" class="muted">none yet</div></div>
+  <div class="panel"><h2>Event stream</h2><div id="log" class="log"></div></div>
+</section>
+
+<!-- ───────────── Chat (blocks 1-2, plan -> 4-5) ───────────── -->
+<section class="tab" id="tab-chat">
+  <div class="panel">
+    <h2>Conversation</h2>
+    <div id="chatlog"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="msg" style="flex:1;min-width:240px" placeholder="e.g. sort the can onto the orange plate" />
+      <select id="ckpt" title="checkpoint (swappable)"></select>
+      <button class="act" onclick="sendChat()">Send</button>
+    </div>
+    <div class="small muted" style="margin-top:6px">The Brain returns a structured plan; click ▶ on a skill call to dispatch it to the VLA engine.</div>
+  </div>
+</section>
+
+<!-- ───────────── History ───────────── -->
+<section class="tab" id="tab-history">
+  <div class="panel"><h2>VLA task history</h2><table id="histtable"><thead><tr><th>task</th><th>name</th><th>status</th><th>checkpoint</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<!-- ───────────── Memory ───────────── -->
+<section class="tab" id="tab-memory">
+  <div class="panel"><h2>Registered skills (block 4 — also the Brain's tools)</h2><div id="skills"></div></div>
+  <div class="panel"><h2>Stores</h2><div class="muted">
+    <b>Monitor (3)</b> = Redis events + live state (this page) ·
+    <b>Memory (2)</b> = SQLite conversation/episodic + vector RAG (the Brain) ·
+    <b>Console</b> reads both. See <span class="mono">docs/agentbot_architecture.html</span>.
+  </div></div>
+</section>
+
+<div class="sub muted" style="margin-top:8px">Monitor (3) = real-time · Memory (2) = cognitive · Console = visualization. AgentBot v0.1 scaffold.</div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const SID='console-'+Math.random().toString(36).slice(2,8);
+
+// tabs
+$$('.tabs button').forEach(b=>b.onclick=()=>{
+  $$('.tabs button').forEach(x=>x.classList.remove('active'));
+  $$('.tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); $('#tab-'+b.dataset.tab).classList.add('active');
+});
+
+// telemetry chart
+const chart=new Chart($('#chart'),{type:'line',
+  data:{labels:[],datasets:[{label:'inference latency (s)',data:[],borderColor:'#6ea8fe',tension:.3,pointRadius:0}]},
+  options:{animation:false,scales:{x:{title:{display:true,text:'step'}}},plugins:{legend:{labels:{color:'#8b98a5'}}}}});
+
+function logLine(t){const d=document.createElement('div');d.textContent=t;
+  const L=$('#log');L.prepend(d);while(L.children.length>200)L.lastChild.remove();}
+
+// live state poll
+async function poll(){
+  try{const s=await (await fetch('/v1/state')).json();
+    const el=$('#state'); el.innerHTML='';
+    const keys=['robot_state','system_status','safety','environment'];
+    let any=false;
+    keys.forEach(k=>{if(s[k]){any=true;const v=s[k];
+      const c=document.createElement('span');c.className='chip '+(v.mode||v.status||'');
+      c.innerHTML=`<span class="dot"></span>${k}: <b>${v.mode||v.status||JSON.stringify(v).slice(0,40)}</b>`;
+      el.appendChild(c);}});
+    if(!any)el.innerHTML='<span class="muted">no state yet — send a command in Chat</span>';
+    // vla tasks + history
+    const tasks=Object.entries(s).filter(([k])=>k.startsWith('vla:'));
+    $('#tasks').innerHTML = tasks.length? tasks.map(([k,v])=>
+      `<span class="chip ${v.status||''}"><span class="dot"></span>${k.slice(4,16)} · <b>${v.status||'?'}</b>${v.success_rate!=null?' · sr '+v.success_rate:''}</span>`).join(' '):'<span class="muted">none yet</span>';
+    const tb=$('#histtable tbody'); tb.innerHTML=tasks.map(([k,v])=>
+      `<tr><td class="mono">${k.slice(4,16)}</td><td>${v.task_name||''}</td><td>${v.status||''}</td><td class="mono">${v.checkpoint_name||''}</td></tr>`).join('');
+    $('#sub').textContent='read-only · live';
+  }catch(e){$('#sub').textContent='read-only · API offline';}
+}
+setInterval(poll,1500); poll();
+
+// event stream (WS)
+function connect(){
+  const ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/v1/events');
+  ws.onopen=()=>$('#connpill').textContent='events: live';
+  ws.onclose=()=>{$('#connpill').textContent='events: reconnecting';setTimeout(connect,1500);};
+  ws.onmessage=m=>{const ev=JSON.parse(m.data);
+    logLine(`[${new Date(ev.ts*1000).toLocaleTimeString()}] ${ev.type} · ${ev.source} ${JSON.stringify(ev.payload).slice(0,80)}`);
+    if(ev.type==='vla_telemetry'&&ev.payload.step){
+      chart.data.labels.push(ev.payload.step);
+      chart.data.datasets[0].data.push(ev.payload.inference_latency_s);
+      if(chart.data.labels.length>60){chart.data.labels.shift();chart.data.datasets[0].data.shift();}
+      chart.update();}
+  };
+}
+connect();
+
+// skills + checkpoints
+async function loadSkills(){
+  const r=await (await fetch('/v1/skills')).json();
+  $('#skills').innerHTML=r.skills.map(s=>`<div style="margin:6px 0"><b>${s.name}</b> <span class="muted">— ${s.description}</span>
+    <div class="small muted">params: ${(s.params||[]).map(p=>p.name+(p.enum?' ['+p.enum.join('|')+']':'')).join(', ')||'none'}</div></div>`).join('');
+}
+async function loadCkpts(){
+  const r=await (await fetch('/v1/vla/checkpoints')).json();
+  $('#ckpt').innerHTML=Object.keys(r.checkpoints).map(n=>`<option ${n===r.default?'selected':''}>${n}</option>`).join('');
+}
+loadSkills(); loadCkpts();
+
+// chat -> plan -> run
+function addBubble(text,cls){const b=document.createElement('div');b.className='bubble '+cls;b.textContent=text;$('#chatlog').appendChild(b);b.scrollIntoView();}
+async function sendChat(){
+  const t=$('#msg').value.trim(); if(!t)return; $('#msg').value='';
+  addBubble(t,'user');
+  const r=await (await fetch('/v1/chat',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({session_id:SID,text:t})})).json();
+  addBubble(r.text||'(no reply)','agent');
+  if(r.plan&&r.plan.calls&&r.plan.calls.length){
+    const wrap=document.createElement('div');wrap.className='bubble agent';
+    wrap.innerHTML='<b>plan</b> · '+r.plan.intent+'<br>'+r.plan.calls.map((c,i)=>
+      `<div class="row" style="margin-top:4px"><span class="pill">${c.name}(${JSON.stringify(c.args)})</span>
+       <button class="act" onclick='runCall(${JSON.stringify(c).replace(/'/g,"&#39;")})'>▶ run in VLA</button></div>`).join('');
+    $('#chatlog').appendChild(wrap);wrap.scrollIntoView();
+  }
+}
+async function runCall(call){
+  const ckpt=$('#ckpt').value;
+  const r=await (await fetch('/v1/skills/'+call.name+'/invoke',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({args:call.args,checkpoint:ckpt})})).json();
+  if(r.task_id){addBubble('▶ dispatched '+call.name+' → task '+r.task_id.slice(5,13)+' (ckpt '+r.checkpoint_name+')','agent');}
+  else{addBubble('✗ '+(r.detail||'invoke failed'),'agent');}
+}
+$('#msg').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+</script>
+</body></html>

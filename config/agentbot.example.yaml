@@ -1,0 +1,42 @@
+# AgentBot configuration. Copy to `config/agentbot.yaml` (gitignored) and edit.
+# Everything machine-specific or swappable lives here — never hardcoded in code.
+
+llm:
+  backend: qwen-vl            # qwen-vl | claude | openai
+  model: Qwen3-VL-8B
+  base_url: http://localhost:8000/v1   # OpenAI-compatible endpoint for the local Qwen3-VL server
+  api_key_env: ""             # name of the env var holding the API key (claude/openai); "" = none
+
+redis:
+  url: redis://localhost:6379/0
+  events_stream: agentbot:events
+  tasks_queue: agentbot:vla:tasks
+  state_hash: agentbot:state
+
+memory:
+  sqlite_path: agentbot/var/agentbot.db
+  vector:
+    backend: chroma           # chroma | none
+    path: agentbot/var/chroma
+
+vla:
+  embodiment: sim             # sim | hardware
+  gr00t_ver: N1.7
+  isaaclab_repo: IsaacLab
+  isaaclab_conda_env: env_isaaclab
+  default_task: Isaac-Can-Sorting-OpenArm-DexHand-v0
+  options: { headless: true, save_video: true, filter: true }
+  # Swappable checkpoint registry — the path is NEVER hardcoded in code.
+  # Change `default_checkpoint`, add entries here, or override per request by name.
+  default_checkpoint: n17_150k_lr1e4_absolute
+  checkpoints:
+    n17_150k_lr1e4_absolute: artifacts/checkpoints/gr00t/N1_7_fft_0615_150k_lr1e4_absolute_no_tune_visual
+    n17_150k_lr5e5:          artifacts/checkpoints/gr00t/N1_7_fft_0614_150k_lr5e5_no_tune_visual
+
+api:
+  host: 0.0.0.0
+  port: 8780
+
+# in-proc | redis — selects EventBus/StateStore/JobQueue impls.
+# "in-proc" runs the whole core in one process (no Redis needed) for local dev/tests.
+backbone: in-proc
