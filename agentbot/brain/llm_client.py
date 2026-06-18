@@ -75,12 +75,27 @@ class OpenAIClient(LLMClient):
         return self._stub_reply(messages, tools)
 
 
+class Gr00tVLMClient(LLMClient):
+    """The Brain VLM extracted + fine-tuned from GR00T N1.7 — the planned replacement
+    for the open-source Qwen3-VL placeholder.
+
+    It honors the same OpenAI-compatible tool-calling contract as ``QwenVLClient``; once
+    the extracted VLM is served, point ``llm.base_url`` at its endpoint and set
+    ``llm.backend: gr00t-vlm``. Stub (keyword fallback) until that model is available.
+    """
+
+    async def complete(self, messages: list[dict[str, Any]], tools: list[dict]) -> LLMReply:
+        return self._stub_reply(messages, tools)
+
+
 def build_llm(cfg) -> LLMClient:
-    """Factory: pick the client from ``cfg.llm.backend`` (qwen-vl | claude | openai)."""
+    """Factory: pick the client from ``cfg.llm.backend`` (qwen-vl | gr00t-vlm | claude | openai)."""
     import os
     backend = getattr(cfg.llm, "backend", "qwen-vl")
     api_key = os.environ.get(cfg.llm.api_key_env, "") if cfg.llm.api_key_env else ""
     kwargs = dict(model=cfg.llm.model, base_url=cfg.llm.base_url, api_key=api_key)
+    if backend == "gr00t-vlm":
+        return Gr00tVLMClient(**kwargs)
     if backend == "claude":
         return ClaudeClient(**kwargs)
     if backend == "openai":

@@ -9,7 +9,9 @@ Backend spec mirrors ``scripts/eval/configs/gr00t_n17_openarm_o6.json``:
 """
 from __future__ import annotations
 
+import os
 import shlex
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -52,13 +54,16 @@ class PolicyServer:
         server = (f"python3 -u -m gr00t.eval.run_gr00t_server "
                   f"--model-path {shlex.quote(self.checkpoint)} "
                   f"--embodiment-tag {emb} --port {self.port}")
-        return f"{activate} && cd {shlex.quote(str(workdir))} && {server}"
+        # `exec` so the bash pid becomes the python server (clean terminate, no orphan).
+        return f"{activate} && cd {shlex.quote(str(workdir))} && exec {server}"
 
     def start(self, log_path: str) -> "PolicyServer":
         Path(log_path).parent.mkdir(parents=True, exist_ok=True)
         self._log = log_path
+        # start_new_session so we can kill the whole process group if terminate stalls.
         self.proc = subprocess.Popen(["bash", "-c", self.build_cmd()],
-                                     stdout=open(log_path, "w"), stderr=subprocess.STDOUT)
+                                     stdout=open(log_path, "w"), stderr=subprocess.STDOUT,
+                                     start_new_session=True)
         return self
 
     def wait_ready(self, timeout: int = READY_TIMEOUT_S) -> bool:
@@ -82,4 +87,7 @@ class PolicyServer:
             try:
                 self.proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                self.proc.kill()
+                try:
+                    os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    self.proc.kill()

@@ -21,8 +21,9 @@
 | Phase | 內容 | 狀態 |
 |---|---|---|
 | **0** | 骨架 + 架構報告（contracts／各層服務／event bus／API／Console／測試） | ✅ **完成**（23 測試綠燈） |
-| **0.5** | 本輪追加：動畫流程圖重繪、改用 uv、TASKS 檔、README | ✅ **完成** |
-| **1** | **MVP** — 把假的 VLA 換成真的 IsaacLab rollout + 真 LLM tool-calling | ⏳ **下一步** |
+| **0.5** | 動畫流程圖重繪、改用 uv、TASKS 檔、README | ✅ **完成** |
+| **0.6** | submodule（squirel2000/agentbot）+ README 多終端機澄清 | ✅ **完成** |
+| **1** | **MVP** — 真 IsaacLab rollout（Option B：驅動 gr00t_infer_agent 跑單集）+ 真 LLM | 🔄 **進行中**（已實作，4090 驗證中） |
 | **2** | 加廣 — 多技能、多步規劃、記憶 RAG、**階層式 Dashboard（含控制）** | ◻ 未開始 |
 | **3** | 實機 — `backends/hardware` → ROS2 → OpenArm（架構圖 6·7） | ◻ 未開始 |
 
@@ -73,17 +74,25 @@
 - [x] README 改寫為 uv 用法
 - [x] 本 TASKS 追蹤檔
 
-## Phase 1 · MVP（下一步）⏳
+## Phase 1 · MVP 🔄 進行中（核心已完成並在 4090 驗證）
 
-**我要做的（讀 repo 即可動工）：**
-- [ ] 在 `env_isaaclab` 裡 `pip install -e agentbot`，讓 worker 能 import
-- [ ] 把 `scripts/eval/gr00t_infer_agent.py` 的單集迴圈移植進 `agentbot/vla/isaac_runner.py:run_rollout`
-      （env 建立 → JointMapper → 組 obs → `policy_client.get_action` → 映射動作+filter → `env.step`×16 → `task_done` → 存檔）
-- [ ] `brain/llm_client.py`：把 `QwenVLClient` 的關鍵字 stub 換成**真的** Qwen3-VL tool-calling（OpenAI 相容 endpoint）
-- [ ] `brain/agent.py`：plan 產生後**真的派工**到 VLA（目前標 `# MVP:` 的地方），並用事件迴授續跑/回覆
-- [ ] 端到端驗證：`POST /v1/skills/sort_can/invoke {"target_color":"orange"}` → IsaacLab 真的跑一集 → Console 看到真遙測與成功率
+**已完成並驗證 ✅**
+- [x] 在 `env_isaaclab` 裡 `pip install -e agentbot --no-deps`（+redis），worker 可 import
+- [x] `agentbot/vla/isaac_runner.py:run_rollout`（**Option B**：以子程序驅動 proven 的 `gr00t_infer_agent.py` 跑單集，
+      複製 run_eval 的啟動方式：cwd=IsaacLab、`client_pythonpath` 上 PYTHONPATH、worker 自身的 env_isaaclab python）；
+      串流解析遙測，並以 `run_manifest.json` 為**權威結果**來源
+- [x] `policy_server.py` 強化（`exec`+new session+`killpg`，乾淨關閉不留孤兒）
+- [x] **4090 實跑驗證**：sort_can 單集，GR00T N1.7 server 開機+IsaacLab 一集，93s 完成；
+      `success_rate=1.0`、遙測延遲 ~0.06–0.14s；server 乾淨關閉、GPU 釋放。
+      （過程抓到並修正一個 bug：原本用 stdout 判斷成敗會誤報，改讀 manifest 後正確回報 SUCCEEDED。）
+- [x] `brain/llm_client.py`：新增 `gr00t-vlm` 後端 seam（你的抽離 VLM 之後改 config 即可換）
 
-**需要你提供／確認的**（見上面「你的下一步」第 2 點的 4 個勾選項）。
+**剩餘 Phase 1 收尾（較低風險）**
+- [ ] `brain/llm_client.py`：把 stub 換成**真的** Qwen3-VL tool-calling（需先有 Qwen OpenAI 相容 server 才能測）
+- [ ] `brain/agent.py`：plan 產生後**自動派工**到 VLA（目前是 Console 按「▶ 執行」或 `POST /v1/skills/{name}/invoke` 顯式派工）
+- [ ] 多集成功率：跑 N 集得統計（單集無法代表成功率；可挑表現較好的 checkpoint，如 `n17_150k_lr1e4_absolute`）
+
+**驗證指令（可重現）**：`env_isaaclab` 下 `python /tmp/verify_phase1.py`，或正式三終端機流程（見 README）。
 
 ## Phase 2 · 加廣（含階層式 Dashboard）◻
 

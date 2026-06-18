@@ -1,6 +1,7 @@
 """Simulation backend (block 5, today): GR00T policy server + IsaacLab rollout."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable, Optional
 
 from agentbot.contracts.vla import VlaTaskRequest, VlaTaskResult
@@ -30,7 +31,8 @@ class SimBackend:
         if self._server and self._server.health():
             return
         srv = PolicyServer(self.backend_spec, req.checkpoint, self.repo_root, self.conda_sh)
-        srv.start(f"output/agentbot/vla_server_{req.task_id}.log")
+        log_path = Path(self.repo_root) / "output" / "agentbot" / f"vla_server_{req.task_id}.log"
+        srv.start(str(log_path))
         if not srv.wait_ready():
             raise RuntimeError("GR00T policy server failed to become ready")
         self._server = srv

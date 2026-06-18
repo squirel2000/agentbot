@@ -22,7 +22,7 @@ from agentbot.contracts.vla import VlaTaskRequest, VlaTaskResult, VlaTaskStatus
 from agentbot.monitor.job_queue import InMemJobQueue, RedisJobQueue
 from agentbot.settings import REPO_ROOT, AppConfig, load_config
 from agentbot.vla.backends.sim import SimBackend
-from agentbot.vla.isaac_runner import FakeRunner
+from agentbot.vla.isaac_runner import FakeRunner, backend_spec
 
 Publish = Callable[[Event], None]
 
@@ -39,12 +39,9 @@ def _result_event(req: VlaTaskRequest, result: VlaTaskResult) -> Event:
 
 
 def _load_backend_spec(cfg: AppConfig) -> dict:
-    """Backend connection spec (host/port/version/embodiment/server_repo), reusing the
-    eval configs so the worker and the eval harness stay consistent."""
-    name = {"N1.7": "gr00t_n17_openarm_o6", "N1.6": "gr00t_n16_openarm_o6"}.get(cfg.vla.gr00t_ver,
-                                                                                 "gr00t_n17_openarm_o6")
-    p = REPO_ROOT / "scripts" / "eval" / "configs" / f"{name}.json"
-    return json.loads(p.read_text()) if p.exists() else {}
+    """Backend connection spec (host/port/version/embodiment/server_repo), reused from
+    the eval configs (via isaac_runner) so worker and eval harness stay consistent."""
+    return backend_spec(cfg.vla.gr00t_ver)
 
 
 def make_backend(cfg: AppConfig, fake: bool) -> SimBackend:

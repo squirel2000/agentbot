@@ -45,7 +45,13 @@ class RedisJobQueue(JobQueue):
 
     def get(self, timeout: float = 0.0) -> Optional[VlaTaskRequest]:
         # BRPOP blocks up to `timeout` seconds (0 = block forever); pair with LPUSH for FIFO.
-        item = self._r.brpop([self._key], timeout=timeout)
+        # Catch TimeoutError: redis-py's socket timeout can race with the BRPOP server-side
+        # timeout and fire first, raising TimeoutError instead of returning None.
+        import redis as _redis
+        try:
+            item = self._r.brpop([self._key], timeout=timeout)
+        except _redis.exceptions.TimeoutError:
+            return None
         if not item:
             return None
         _key, raw = item
