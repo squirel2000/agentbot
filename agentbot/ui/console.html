@@ -20,7 +20,7 @@ h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
 .chip{padding:6px 12px;border-radius:20px;border:1px solid var(--border);font-size:13px;
 background:var(--panel);display:flex;align-items:center;gap:6px}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
-.running .dot,.succeeded .dot{background:var(--ok)}
+.running .dot,.succeeded .dot,.done .dot{background:var(--ok)}
 .queued .dot{background:var(--warn);animation:pulse 1.2s infinite}
 .failed .dot,.blocked .dot{background:var(--bad)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
@@ -35,6 +35,8 @@ th{color:var(--muted)}
 button.toggle,button.act{background:var(--panel);color:var(--text);border:1px solid var(--border);
 border-radius:8px;padding:7px 11px;cursor:pointer}
 button.act{border-color:var(--accent)}
+button.danger{border-color:var(--bad);color:var(--bad)}
+button.warn-btn{border-color:var(--warn);color:var(--warn)}
 canvas{max-height:220px}
 input,select,textarea{background:var(--bg);color:var(--text);border:1px solid var(--border);
 border-radius:8px;padding:8px;font:inherit}
@@ -46,6 +48,30 @@ textarea{width:100%;min-height:54px;resize:vertical}
 .bubble.user{margin-left:auto;border-color:var(--accent)}
 .pill{font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid var(--border);color:var(--muted)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:680px){.grid2{grid-template-columns:1fr}}
+/* status chips for command queue */
+.status-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:2px 8px;
+border-radius:12px;border:1px solid var(--border);white-space:nowrap}
+.status-chip.queued{border-color:var(--warn);color:var(--warn)}
+.status-chip.queued .dot{background:var(--warn);animation:pulse 1.2s infinite}
+.status-chip.running{border-color:var(--ok);color:var(--ok)}
+.status-chip.running .dot{background:var(--ok)}
+.status-chip.done{border-color:var(--ok);color:var(--ok)}
+.status-chip.done .dot{background:var(--ok)}
+.status-chip.failed{border-color:var(--bad);color:var(--bad)}
+.status-chip.failed .dot{background:var(--bad)}
+.status-chip.cleared{border-color:var(--muted);color:var(--muted)}
+.status-chip.cleared .dot{background:var(--muted)}
+/* command queue rows */
+.cmd-row{padding:6px 4px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.cmd-row:hover{background:var(--track)}
+.cmd-row:last-child{border-bottom:none}
+.cmd-text{font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmd-ts{font-size:11px;color:var(--muted);white-space:nowrap}
+/* skill runs detail */
+.skill-runs{padding:6px 12px 6px 24px;background:var(--track);border-bottom:1px solid var(--border);display:none}
+.skill-runs.open{display:block}
+.skill-run-row{font-size:12px;padding:3px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cmd-queue-empty{text-align:center;color:var(--muted);padding:16px;font-size:13px}
 </style>
 <script src="/vendor/chart.umd.min.js"></script>
 <script>
@@ -67,6 +93,7 @@ document.documentElement.setAttribute('data-theme',t);localStorage.setItem(k,t);
 <div class="tabs">
   <button class="active" data-tab="monitor">Monitor</button>
   <button data-tab="chat">Chat</button>
+  <button data-tab="commands">Commands</button>
   <button data-tab="history">History</button>
   <button data-tab="memory">Memory</button>
 </div>
@@ -81,17 +108,31 @@ document.documentElement.setAttribute('data-theme',t);localStorage.setItem(k,t);
   <div class="panel"><h2>Event stream</h2><div id="log" class="log"></div></div>
 </section>
 
-<!-- ───────────── Chat (blocks 1-2, plan -> 4-5) ───────────── -->
+<!-- ───────────── Chat (command enqueue) ───────────── -->
 <section class="tab" id="tab-chat">
   <div class="panel">
-    <h2>Conversation</h2>
+    <h2>Send command</h2>
     <div id="chatlog"></div>
     <div class="row" style="margin-top:10px">
       <input id="msg" style="flex:1;min-width:240px" placeholder="e.g. sort the can onto the orange plate" />
       <select id="ckpt" title="checkpoint (swappable)"></select>
-      <button class="act" onclick="sendChat()">Send</button>
+      <button class="act" onclick="sendCommand()">Enqueue</button>
     </div>
-    <div class="small muted" style="margin-top:6px">The Brain returns a structured plan; click ▶ on a skill call to dispatch it to the VLA engine.</div>
+    <div class="sub muted" style="margin-top:6px">Command is enqueued immediately; the Brain processes it asynchronously. Check the <b>Commands</b> tab for status and results.</div>
+  </div>
+</section>
+
+<!-- ───────────── Commands (queue / history panel) ───────────── -->
+<section class="tab" id="tab-commands">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h2 style="margin:0">Command queue &amp; history</h2>
+      <div class="row" style="gap:6px">
+        <button class="act warn-btn" onclick="clearQueue()" title="Delete all pending (queued) commands">Clear queue</button>
+        <button class="act danger" onclick="stopOrchestrator()" title="Stop orchestrator and clear queue">⏹ Stop</button>
+      </div>
+    </div>
+    <div id="cmd-list"><div class="cmd-queue-empty">No commands yet. Send one in the Chat tab.</div></div>
   </div>
 </section>
 
@@ -182,29 +223,175 @@ async function loadCkpts(){
 }
 loadSkills(); loadCkpts();
 
-// chat -> plan -> run
-function addBubble(text,cls){const b=document.createElement('div');b.className='bubble '+cls;b.textContent=text;$('#chatlog').appendChild(b);b.scrollIntoView();}
-async function sendChat(){
-  const t=$('#msg').value.trim(); if(!t)return; $('#msg').value='';
-  addBubble(t,'user');
-  const r=await (await fetch('/v1/chat',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({session_id:SID,text:t})})).json();
-  addBubble(r.text||'(no reply)','agent');
-  if(r.plan&&r.plan.calls&&r.plan.calls.length){
-    const wrap=document.createElement('div');wrap.className='bubble agent';
-    wrap.innerHTML='<b>plan</b> · '+r.plan.intent+'<br>'+r.plan.calls.map((c,i)=>
-      `<div class="row" style="margin-top:4px"><span class="pill">${c.name}(${JSON.stringify(c.args)})</span>
-       <button class="act" onclick='runCall(${JSON.stringify(c).replace(/'/g,"&#39;")})'>▶ run in VLA</button></div>`).join('');
-    $('#chatlog').appendChild(wrap);wrap.scrollIntoView();
+// ─────────────────────────────────────────────────────────
+// COMMAND QUEUE UI
+// ─────────────────────────────────────────────────────────
+
+// Enqueue a command via POST /v1/commands, clear input immediately
+function addChatLine(text, cls) {
+  const b = document.createElement('div');
+  b.className = 'bubble ' + cls;
+  b.textContent = text;
+  $('#chatlog').appendChild(b);
+  b.scrollIntoView({block:'nearest'});
+}
+
+async function sendCommand() {
+  const inp = $('#msg');
+  const t = inp.value.trim();
+  if (!t) return;
+  inp.value = ''; // clear immediately so user can type next command
+  addChatLine(t, 'user');
+  try {
+    const r = await (await fetch('/v1/commands', {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({text: t, session_id: SID})
+    })).json();
+    if (r.command_id) {
+      addChatLine('Queued as ' + r.command_id.slice(0, 16) + '… — see Commands tab for status.', 'agent');
+      // switch to Commands tab so user sees the queue
+      // (don't force-switch; just refresh the list)
+      refreshCmdList();
+    } else {
+      addChatLine('Error: ' + JSON.stringify(r), 'agent');
+    }
+  } catch (e) {
+    addChatLine('Failed to enqueue: ' + e, 'agent');
   }
 }
-async function runCall(call){
-  const ckpt=$('#ckpt').value;
-  const r=await (await fetch('/v1/skills/'+call.name+'/invoke',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({args:call.args,checkpoint:ckpt})})).json();
-  if(r.task_id){addBubble('▶ dispatched '+call.name+' → task '+r.task_id.slice(5,13)+' (ckpt '+r.checkpoint_name+')','agent');}
-  else{addBubble('✗ '+(r.detail||'invoke failed'),'agent');}
+
+$('#msg').addEventListener('keydown', e => { if (e.key === 'Enter') sendCommand(); });
+
+// ── Command list rendering ──
+
+// Track which command IDs have their skill_runs open
+const openIds = new Set();
+// Cache of fetched skill_runs per command_id
+const skillRunsCache = {};
+
+function fmtTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString();
 }
-$('#msg').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+
+function statusChip(status) {
+  return `<span class="status-chip ${status}"><span class="dot"></span>${status}</span>`;
+}
+
+function renderSkillRuns(runs) {
+  if (!runs || !runs.length) return '<div class="muted" style="font-size:12px">no skill runs recorded yet</div>';
+  return runs.map(r => `<div class="skill-run-row">
+    <span class="pill">${r.skill||'?'}</span>
+    <span>${statusChip(r.status||'?')}</span>
+    <span class="muted" style="font-size:12px">success: ${r.success ? '✓' : '✗'}</span>
+    <span class="muted" style="font-size:12px">steps: ${r.steps??'—'}</span>
+    <span class="muted" style="font-size:12px">attempt: ${r.attempt??1}</span>
+    ${r.duration_s != null ? `<span class="muted" style="font-size:12px">${r.duration_s.toFixed(2)}s</span>` : ''}
+  </div>`).join('');
+}
+
+async function toggleDetail(cmdId) {
+  const detEl = document.getElementById('runs-' + cmdId);
+  if (!detEl) return;
+  if (openIds.has(cmdId)) {
+    openIds.delete(cmdId);
+    detEl.classList.remove('open');
+  } else {
+    openIds.add(cmdId);
+    detEl.classList.add('open');
+    // Fetch skill runs if not cached
+    if (!skillRunsCache[cmdId]) {
+      detEl.innerHTML = '<div class="muted" style="font-size:12px;padding:4px">Loading…</div>';
+      try {
+        const d = await (await fetch('/v1/commands/' + encodeURIComponent(cmdId))).json();
+        skillRunsCache[cmdId] = d.skill_runs || [];
+      } catch (e) {
+        skillRunsCache[cmdId] = [];
+      }
+    }
+    detEl.innerHTML = renderSkillRuns(skillRunsCache[cmdId]);
+  }
+}
+
+function renderCmdList(cmds) {
+  const el = $('#cmd-list');
+  if (!cmds || !cmds.length) {
+    el.innerHTML = '<div class="cmd-queue-empty">No commands yet. Send one in the Chat tab.</div>';
+    return;
+  }
+  // Build HTML; preserve open state
+  el.innerHTML = cmds.map(c => {
+    const isOpen = openIds.has(c.command_id);
+    // Invalidate cache if status changed (running/done transitions)
+    // Simple heuristic: re-fetch if done/failed and cache exists
+    const needsRefresh = (c.status === 'done' || c.status === 'failed') && skillRunsCache[c.command_id];
+    if (needsRefresh) delete skillRunsCache[c.command_id];
+    return `<div class="cmd-row row" onclick="toggleDetail('${c.command_id}')" title="Click to toggle skill runs">
+      <span class="cmd-text">${escHtml(c.text)}</span>
+      ${statusChip(c.status || 'unknown')}
+      <span class="cmd-ts">${fmtTs(c.created_ts)}</span>
+    </div>
+    <div class="skill-runs ${isOpen ? 'open' : ''}" id="runs-${c.command_id}">
+      ${isOpen && skillRunsCache[c.command_id] ? renderSkillRuns(skillRunsCache[c.command_id]) : '<div class="muted" style="font-size:12px">Loading…</div>'}
+    </div>`;
+  }).join('');
+
+  // If any were open, re-fetch their skill_runs asynchronously
+  cmds.forEach(c => {
+    if (openIds.has(c.command_id) && !skillRunsCache[c.command_id]) {
+      fetch('/v1/commands/' + encodeURIComponent(c.command_id))
+        .then(r => r.json())
+        .then(d => {
+          skillRunsCache[c.command_id] = d.skill_runs || [];
+          const el2 = document.getElementById('runs-' + c.command_id);
+          if (el2 && el2.classList.contains('open')) el2.innerHTML = renderSkillRuns(skillRunsCache[c.command_id]);
+        })
+        .catch(() => {});
+    }
+  });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function refreshCmdList() {
+  try {
+    const r = await (await fetch('/v1/commands?n=50')).json();
+    renderCmdList(r.commands);
+  } catch (e) {
+    // silently ignore if API is offline
+  }
+}
+
+// Poll every 1.5s
+setInterval(refreshCmdList, 1500);
+refreshCmdList();
+
+// ── Queue controls ──
+
+async function clearQueue() {
+  try {
+    const r = await (await fetch('/v1/commands', {method: 'DELETE'})).json();
+    // refresh immediately
+    await refreshCmdList();
+    // brief toast in the chatlog (user may be on Chat tab)
+    addChatLine('Cleared ' + (r.cleared ?? 0) + ' pending command(s) from queue.', 'agent');
+  } catch (e) {
+    addChatLine('Clear queue failed: ' + e, 'agent');
+  }
+}
+
+async function stopOrchestrator() {
+  try {
+    const r = await (await fetch('/v1/control/stop', {method: 'POST'})).json();
+    await refreshCmdList();
+    addChatLine('Orchestrator stopped. Queue cleared.', 'agent');
+  } catch (e) {
+    addChatLine('Stop failed: ' + e, 'agent');
+  }
+}
 </script>
 </body></html>

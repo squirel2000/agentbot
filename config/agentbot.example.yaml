@@ -1,7 +1,7 @@
 # AgentBot configuration. Copy to `config/agentbot.yaml` (gitignored) and edit.
 # Everything machine-specific or swappable lives here — never hardcoded in code.
 
-llm:
+vlm:
   backend: qwen-vl            # qwen-vl | claude | openai
   model: Qwen3-VL-8B
   base_url: http://localhost:8000/v1   # OpenAI-compatible endpoint for the local Qwen3-VL server

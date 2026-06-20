@@ -69,6 +69,11 @@ class Orchestrator:
             cmd = await asyncio.to_thread(self.cq.next, 5)
             if cmd is not None:
                 await self._run_command(cmd)
+            else:
+                # In-mem next() never blocks (returns None immediately), so back off to
+                # avoid a hot spin that floods the thread executor and starves scheduling.
+                # (Redis next() blocks via BRPOP, so this sleep is effectively skipped.)
+                await asyncio.sleep(0.1)
 
     async def run_one(self) -> None:
         """Pop and execute exactly one command (for tests and one-shot calls)."""

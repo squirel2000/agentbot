@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Optional
 
 from agentbot.brain.gateway import Gateway
-from agentbot.brain.llm_client import LLMClient
+from agentbot.brain.vlm_client import VLMClient
 from agentbot.brain.memory.conversation import ConversationMemory
 from agentbot.contracts.events import Event, EventType
 from agentbot.contracts.messages import AgentResponse, AgentState, UserMessage
@@ -23,7 +23,7 @@ from agentbot.skills.registry import SkillRegistry
 
 
 class BrainAgent:
-    def __init__(self, llm: LLMClient, registry: SkillRegistry,
+    def __init__(self, llm: VLMClient, registry: SkillRegistry,
                  conversation: ConversationMemory, bus: Optional[EventBus] = None,
                  gateway: Optional[Gateway] = None) -> None:
         self.llm = llm

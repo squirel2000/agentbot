@@ -22,7 +22,7 @@ _DEFAULT_CONFIG = AGENTBOT_DIR / "config" / "agentbot.yaml"
 _EXAMPLE_CONFIG = AGENTBOT_DIR / "config" / "agentbot.example.yaml"
 
 
-class LlmCfg(BaseModel):
+class VlmCfg(BaseModel):
     backend: str = "qwen-vl"
     model: str = "Qwen3-VL-8B"
     base_url: str = "http://localhost:8000/v1"
@@ -81,7 +81,7 @@ class ApiCfg(BaseModel):
 
 
 class AppConfig(BaseModel):
-    llm: LlmCfg = Field(default_factory=LlmCfg)
+    vlm: VlmCfg = Field(default_factory=VlmCfg)
     redis: RedisCfg = Field(default_factory=RedisCfg)
     memory: MemoryCfg = Field(default_factory=MemoryCfg)
     vla: VlaCfg = Field(default_factory=VlaCfg)
@@ -98,4 +98,7 @@ def load_config(path: str | None = None) -> AppConfig:
     else:
         cfg_path = _EXAMPLE_CONFIG
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    # Deprecated alias: old configs used `llm:` — silently promote to `vlm:`.
+    if "llm" in data and "vlm" not in data:
+        data["vlm"] = data.pop("llm")
     return AppConfig.model_validate(data)

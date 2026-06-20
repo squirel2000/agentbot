@@ -7,21 +7,27 @@ Redis for local dev/tests; switch to ``redis`` to span the API and the separate
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 from agentbot.brain.agent import BrainAgent
 from agentbot.brain.gateway import Gateway
-from agentbot.brain.llm_client import build_llm
+from agentbot.brain.vlm_client import build_vlm
 from agentbot.brain.memory.conversation import ConversationMemory
 from agentbot.brain.memory.episodic import EpisodicMemory
 from agentbot.brain.memory.store import MemoryStore
+from agentbot.brain.orchestrator import Orchestrator
 from agentbot.contracts.common import Embodiment
 from agentbot.contracts.events import Event
+from agentbot.contracts.skills import SkillCall
+from agentbot.monitor.command_queue import InMemCommandQueue, RedisCommandQueue
 from agentbot.monitor.event_bus import EventBus, InProcEventBus, RedisEventBus
 from agentbot.monitor.ingest import Ingestor
 from agentbot.monitor.job_queue import InMemJobQueue, JobQueue, RedisJobQueue
+from agentbot.monitor.results import ResultWaiter
 from agentbot.monitor.safety import SafetyWatchdog
 from agentbot.monitor.state_store import InMemStateStore, RedisStateStore, StateStore
+from agentbot.records.store import Records
 from agentbot.settings import AppConfig, load_config
 from agentbot.skills.builtin.pour_water import PourWaterSkill
 from agentbot.skills.builtin.sort_can import SortCanSkill
@@ -40,6 +46,11 @@ class Deps:
             self.state = InMemStateStore()
             self.queue = InMemJobQueue()
 
+        if cfg.backbone == "redis":
+            self.command_queue = RedisCommandQueue(cfg.redis.url)
+        else:
+            self.command_queue = InMemCommandQueue()
+
         self.registry = SkillRegistry()
         self.registry.register(SortCanSkill())
         self.registry.register(PourWaterSkill())
@@ -47,11 +58,26 @@ class Deps:
         store = MemoryStore(cfg.memory.sqlite_path)
         self.conversation = ConversationMemory(store)
         self.episodic = EpisodicMemory(store)
+        self.records = Records(str(Path(cfg.memory.sqlite_path).parent / "records.db"))
+        self.results = ResultWaiter(self.bus)
         self.gateway = Gateway()
-        self.agent = BrainAgent(build_llm(cfg), self.registry, self.conversation,
+        self.agent = BrainAgent(build_vlm(cfg), self.registry, self.conversation,
                                 bus=self.bus, gateway=self.gateway)
         self.ingestor = Ingestor(self.bus, self.state, self.episodic)
         self.watchdog = SafetyWatchdog(self.bus, on_stop=self._on_safety_stop)
+        self.orchestrator = Orchestrator(
+            self.agent, self.registry, self.command_queue, self._dispatch,
+            self.results, self.records, vla_ctx=lambda: self.vla_ctx(None),
+            max_retries=2,
+        )
+
+    def _dispatch(self, call: SkillCall, ctx: dict) -> str:
+        skill = self.registry.get(call.name)
+        if skill is None:
+            raise ValueError(f"unknown skill '{call.name}'")
+        req = skill.to_vla_request(call, ctx)
+        self.queue.put(req)
+        return req.task_id
 
     def _on_safety_stop(self, ev: Event) -> None:
         # sim: mark the robot blocked; hardware future: ROS2 e-stop override.

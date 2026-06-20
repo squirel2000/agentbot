@@ -2,7 +2,7 @@
 with conversation memory persisted and lifecycle events emitted."""
 from agentbot.brain.agent import BrainAgent
 from agentbot.brain.gateway import Gateway
-from agentbot.brain.llm_client import QwenVLClient
+from agentbot.brain.vlm_client import QwenVLClient
 from agentbot.brain.memory.store import MemoryStore
 from agentbot.brain.memory.conversation import ConversationMemory
 from agentbot.monitor.event_bus import InProcEventBus

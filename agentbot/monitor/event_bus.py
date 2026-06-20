@@ -59,10 +59,19 @@ class RedisEventBus(EventBus):
         await self._r.xadd(self._stream, {"json": event.model_dump_json()})
 
     async def subscribe(self, types: Optional[Iterable[EventType]] = None) -> AsyncIterator[Event]:
+        import redis as _redis
         want = set(types) if types else None
         last = "$"
         while True:
-            resp = await self._r.xread({self._stream: last}, block=0, count=64)
+            # Finite block + tolerate timeouts/connection blips: redis-py's socket timeout
+            # races with an indefinite (block=0) XREAD and raises TimeoutError, which would
+            # otherwise kill this subscriber for good (and any future waiting on it).
+            try:
+                resp = await self._r.xread({self._stream: last}, block=5000, count=64)
+            except (_redis.exceptions.TimeoutError, _redis.exceptions.ConnectionError):
+                continue
+            if not resp:
+                continue
             for _stream, entries in resp:
                 for eid, fields in entries:
                     last = eid

@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from agentbot.api import routes_chat, routes_events, routes_skills, routes_vla
+from agentbot.api import routes_chat, routes_commands, routes_events, routes_skills, routes_vla
 from agentbot.api.deps import Deps, get_deps
 from agentbot.vla.isaac_runner import FakeRunner
 from agentbot.vla.worker import _result_event, _status_event
@@ -43,7 +43,12 @@ async def _fake_vla_pump(d: Deps) -> None:
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     d = get_deps()
-    tasks = [asyncio.create_task(d.ingestor.run()), asyncio.create_task(d.watchdog.run())]
+    tasks = [
+        asyncio.create_task(d.ingestor.run()),
+        asyncio.create_task(d.watchdog.run()),
+        asyncio.create_task(d.results.run()),
+        asyncio.create_task(d.orchestrator.run()),
+    ]
     if d.cfg.backbone != "redis":
         tasks.append(asyncio.create_task(_fake_vla_pump(d)))
     try:
@@ -55,6 +60,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AgentBot API", version="0.1.0", lifespan=lifespan)
 app.include_router(routes_chat.router)
+app.include_router(routes_commands.router)
 app.include_router(routes_skills.router)
 app.include_router(routes_vla.router)
 app.include_router(routes_events.router)
