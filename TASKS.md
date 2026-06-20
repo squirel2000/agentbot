@@ -94,15 +94,17 @@
 
 **驗證指令（可重現）**：`env_isaaclab` 下 `python /tmp/verify_phase1.py`，或正式三終端機流程（見 README）。
 
-## Phase 2 · 加廣（含階層式 Dashboard）◻
+## Phase 2 · 加廣（長任務編排 + Dashboard + RAG）📋 已詳細規劃
 
-- [ ] **階層式 Dashboard / 控制台**（回答你的問題 #2，建議做）：在現有唯讀 Console 上加
-      （a）**層級下鑽**：系統 → 程序 → 區塊 → 任務 → 單集；
-      （b）**控制動作**（非唯讀）：暫停 / 中止 / 緊急停止、選 checkpoint、手動觸發技能、調參；
-      （c）Redis / 佇列 / 事件健康狀態面板。建議用 FastAPI WebSocket + 既有 `dashboard.py` 模式。
-- [ ] 更多技能（pick/place/pour…）、**多步規劃**（一個 SkillPlan 串多個 SkillCall）
-- [ ] 記憶 RAG：情節記憶 + 向量庫，讓 Brain 會參考過去結果
-- [ ] 真實安全事件來源（不只示範）
+詳細計畫：**[`docs/plans/2026-06-19-phase2-orchestration-core.md`](docs/plans/2026-06-19-phase2-orchestration-core.md)**。
+已確認決策：執行順序＝**先編排核心**；Dashboard＝**沿用 vanilla**；失敗＝**重試 N 次→大腦重規劃/中止**。
+
+- [ ] **2a · 編排核心（先做）**：命令佇列（submit 後清空輸入、FIFO、可清除）→ 大腦把命令拆成有序 atomic skills →
+      **常駐 IsaacLab session**（`vla/sim_session.py`，App 全程開著）逐一執行 → Monitor 確認（`task_done` + 小 VLM judge hook，回答你的 #3）→
+      成功推進 / 失敗重試 N 次→重規劃或中止 → 全程紀錄 + 統計（任務管理）。`llm`→`vlm` 改名也在此（你的 #1）。
+- [ ] **2b · 階層式 Dashboard + 控制**（vanilla 擴充 Console）：可展開 sidebar/navigator、下鑽（命令→計畫→技能→單集）、控制鈕（停止/清除/E-stop/選 checkpoint/手動觸發）。
+- [ ] **2c · 記憶 RAG**：把過去 episode（skill/參數/結果/失敗原因）+ lessons 入向量庫，規劃時檢索回注，讓大腦參考歷史。
+- [ ] 配套：多新增幾個 atomic skill（pick/place/move…）讓多步計畫更有料；真實安全事件來源。
 
 ## Phase 3 · 實機（架構圖 6·7）◻
 

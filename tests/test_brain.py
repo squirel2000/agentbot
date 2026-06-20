@@ -34,3 +34,10 @@ async def test_brain_persists_conversation():
     await agent.handle(msg)
     turns = agent.conversation.recent("s2", n=10)
     assert [t["role"] for t in turns] == ["user", "agent"]
+
+
+async def test_agent_plan_returns_skillplan():
+    agent = _agent()   # QwenVLClient stub + sort_can registered
+    plan = await agent.plan("sort the can onto the orange plate", session_id="s1")
+    assert plan.calls and plan.calls[0].name == "sort_can"
+    assert plan.calls[0].args.get("target_color") == "orange"
