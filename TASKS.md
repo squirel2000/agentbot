@@ -99,9 +99,12 @@
 詳細計畫：**[`docs/plans/2026-06-19-phase2-orchestration-core.md`](docs/plans/2026-06-19-phase2-orchestration-core.md)**。
 已確認決策：執行順序＝**先編排核心**；Dashboard＝**沿用 vanilla**；失敗＝**重試 N 次→大腦重規劃/中止**。
 
-- [ ] **2a · 編排核心（先做）**：命令佇列（submit 後清空輸入、FIFO、可清除）→ 大腦把命令拆成有序 atomic skills →
-      **常駐 IsaacLab session**（`vla/sim_session.py`，App 全程開著）逐一執行 → Monitor 確認（`task_done` + 小 VLM judge hook，回答你的 #3）→
-      成功推進 / 失敗重試 N 次→重規劃或中止 → 全程紀錄 + 統計（任務管理）。`llm`→`vlm` 改名也在此（你的 #1）。
+- [x] **2a · 編排核心 ✅ 完成並在 4090 端到端驗證**（subagent 驅動，未 commit）：命令佇列（submit 清空輸入、FIFO、可清除）→ 大腦拆成有序 atomic skills →
+      **常駐 IsaacLab session**（`vla/sim_session.py`，App 全程開著）逐一執行 → Monitor 確認（`task_done` + 小 VLM judge hook）→
+      成功推進 / 失敗重試 N 次→重規劃或中止 → 全程紀錄 + 統計。`llm`→`vlm` 改名完成（含舊鍵相容）。
+      **31 單元測試綠 + 完整 redis 4-程序 E2E：** 一句命令 → 規劃 → sim_session 真跑一集 → `done`（sort_can succeeded, steps 352, success_rate 1.0）。
+      過程抓到並修正 **5 個只有實跑才會出現的 bug**（orchestrator 閒置 hot-loop；N1.7 client wire format 需 `client_pythonpath`；整集 `inference_mode`；sim_session 閒置要 pump Omniverse 不可卡在 redis；`RedisEventBus` XREAD 要容忍 socket timeout）。
+      小尾巴：`deps.py` 的 `records.db` 路徑為相對（建議改絕對）；sim_session 對 SIGTERM 不理（Omniverse），teardown 需 `kill -9`。
 - [ ] **2b · 階層式 Dashboard + 控制**（vanilla 擴充 Console）：可展開 sidebar/navigator、下鑽（命令→計畫→技能→單集）、控制鈕（停止/清除/E-stop/選 checkpoint/手動觸發）。
 - [ ] **2c · 記憶 RAG**：把過去 episode（skill/參數/結果/失敗原因）+ lessons 入向量庫，規劃時檢索回注，讓大腦參考歷史。
 - [ ] 配套：多新增幾個 atomic skill（pick/place/move…）讓多步計畫更有料；真實安全事件來源。

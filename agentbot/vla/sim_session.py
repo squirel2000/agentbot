@@ -264,9 +264,17 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import signal
+
+    def _term(*_):                       # turn SIGTERM into a clean shutdown
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, _term)
+
     try:
         main()
+    except KeyboardInterrupt:
+        print("[sim_session] shutting down", flush=True)
     finally:
-        # Always shut Omniverse down — a crash mid-skill must not leave a hung app
-        # holding the GPU.
+        # Always shut Omniverse down — a crash/term mid-skill must not leave a hung app
+        # holding the GPU. (SIGTERM now reaches here, so `kill` works without -9.)
         simulation_app.close()

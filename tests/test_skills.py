@@ -1,6 +1,9 @@
 """Skills (block 4) validate a SkillCall against their spec and translate it into
 a VlaTaskRequest. They never hardcode a checkpoint — it comes from ctx."""
 from agentbot.skills.builtin.sort_can import SortCanSkill
+from agentbot.skills.builtin.pick import PickSkill
+from agentbot.skills.builtin.place import PlaceSkill
+from agentbot.skills.builtin.home import HomeSkill
 from agentbot.contracts.skills import SkillCall
 from agentbot.contracts.common import Embodiment
 
@@ -34,3 +37,32 @@ def test_sort_can_rejects_bad_enum():
 def test_sort_can_rejects_missing_required():
     ok, err = SortCanSkill().validate(SkillCall(name="sort_can", args={}))
     assert not ok and "target_color" in err
+
+
+def test_pick_translates_object_into_instruction():
+    sk = PickSkill()
+    call = SkillCall(name="pick", args={"object": "can"})
+    ok, err = sk.validate(call)
+    assert ok, err
+    req = sk.to_vla_request(call, CTX)
+    assert "can" in req.instruction
+    assert req.params["object"] == "can"
+    assert req.checkpoint == CTX["checkpoint"]
+
+
+def test_place_requires_target():
+    ok, err = PlaceSkill().validate(SkillCall(name="place", args={}))
+    assert not ok and "target" in err
+    req = PlaceSkill().to_vla_request(SkillCall(name="place", args={"target": "orange plate"}), CTX)
+    assert "orange plate" in req.instruction
+    assert req.params["target"] == "orange plate"
+
+
+def test_home_takes_no_args():
+    sk = HomeSkill()
+    call = SkillCall(name="home", args={})
+    ok, err = sk.validate(call)
+    assert ok, err
+    req = sk.to_vla_request(call, CTX)
+    assert req.params == {}
+    assert req.checkpoint == CTX["checkpoint"]

@@ -1,109 +1,96 @@
-# AgentBot — the agentic stack (architecture.png)
+# AgentBot
 
-A natural-language command → an LLM **Brain** that reasons/plans/selects **skills** → each skill drives the
-**GR00T VLA** to execute in **IsaacLab** (today) or on real hardware (future). A **Monitor / event bus** watches
-every layer and closes the feedback + immediate-safety loops.
+**The orchestration layer that runs the whole agentic robot system.** A natural-language command flows
+through an LLM/VLM **Brain** that reasons, plans, and decomposes it into atomic **skills**; each skill drives the
+**GR00T VLA** to execute — today in the **IsaacLab** simulator, tomorrow on the real OpenArm. A **Monitor / event
+bus** watches every layer and closes the feedback + immediate-safety loops. AgentBot also owns the **dashboard
+(UI)**, the **command queue**, and the **records/History + stats**.
 
 ```
-1 User Input → 2 Brain/ClawBot → 4 Skill Layer → 5 VLA Engine → (6 Robot Control → 7 Physical)
-                         3 Monitor / Event Bus observes all + feedback
+        ┌─────────────────────────── AgentBot controls all of this ───────────────────────────┐
+ you ─► 1 User Input ─► 2 Brain (VLM) ─► 4 Skill Layer ─► 5 VLA Engine ─► (6 Robot ─► 7 Physical)
+   (UI/dashboard)         reason·plan·       atomic           GR00T +            └ future hardware
+                          decompose          skills           IsaacLab
+                                  ▲                                │
+                                  └──────── 3 Monitor / Event Bus ─┘   (live state · feedback · safety · History)
 ```
 
-Full design: [`docs/agentbot_architecture.html`](../docs/agentbot_architecture.html).
-This package is the **Phase-0 scaffold**: contracts, services, event bus, API, console, and tests — runnable and
-demoable end-to-end with a fake VLA (no GPU). Porting the real IsaacLab rollout is Phase 1.
+> 📊 **Full architecture, module breakdown & animated data-flow:** [`docs/agentbot_system.html`](docs/agentbot_system.html)
+> 📋 **Status & roadmap:** [`TASKS.md`](TASKS.md) · **Phase-2 plan:** [`docs/plans/`](docs/plans/)
 
-## Layout → architecture blocks
+---
 
-| Path | Block |
-|------|-------|
-| `agentbot/contracts/` | the **protocol** (Pydantic; shared by all layers) |
-| `agentbot/brain/` | **2** — gateway, pluggable LLM (Qwen3-VL default), memory |
-| `agentbot/skills/` | **4** — semantic action tools + registry |
-| `agentbot/vla/` | **5** — worker, IsaacLab runner, GR00T policy-server lifecycle (reuses `scripts/eval/*`) |
-| `agentbot/monitor/` | **3** — event bus, live state, safety watchdog, ingest |
-| `agentbot/api/` + `agentbot/ui/` | wires 1·2·4·5; read-only Console |
+## Quick start
 
-## Install
-
-Prereq: [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`).
+Prereq: [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`). Run everything from the `agentbot/` folder.
 
 ```bash
-uv sync            # builds an isolated .venv from pyproject + uv.lock (does not touch conda envs)
-uv run pytest -q   # 23 passed
+uv sync && uv run pytest -q          # install + run the unit suite (31 passed)
 ```
 
-`uv sync` also installs the `dev` group; add `--extra vector` for the optional semantic-memory store.
-
-## Run
-
-> All commands below run **from the `agentbot/` folder** (the uv project root), unless noted.
-
-**Single-process demo** (in-proc bus + fake VLA, no Redis/GPU) — open <http://localhost:8780>:
-
+### A) No-GPU demo (one process, fake VLA)
+Set `backbone: in-proc` in `config/agentbot.yaml`, then open <http://localhost:8780>:
 ```bash
-cd agentbot
 uv run uvicorn agentbot.api.app:app --port 8780
 ```
+Type a command in the dashboard → the Brain plans it → a fake VLA "runs" it → watch it reach `done`.
 
-**Real, multi-process** — Core/Console and the GPU worker are **separate processes in separate terminals**.
-
+### B) Real flow on a GPU (4 processes)
+Set `backbone: redis` in `config/agentbot.yaml`. Then, in 4 terminals:
 ```bash
-# one-time: create your config and switch the backbone to redis
-cp agentbot/config/agentbot.example.yaml agentbot/config/agentbot.yaml
-#   then edit agentbot/config/agentbot.yaml  →  set the bottom line:  backbone: redis
+redis-server                                                      # 1 · the cross-process bus
+uv run uvicorn agentbot.api.app:app --port 8780                   # 2 · Core + dashboard + orchestrator
+cd Isaac-GR00T_n1d7 && source .venv/bin/activate \
+  && python -m gr00t.eval.run_gr00t_server --model-path <ckpt> --embodiment-tag new_embodiment --port 5555   # 3 · GR00T server
+conda activate env_isaaclab && pip install -e agentbot \
+  && cd IsaacLab && python -m agentbot.vla.sim_session --headless  # 4 · persistent IsaacLab (stays open)
 ```
+Then send commands from the dashboard (or `POST /v1/commands`). The orchestrator dispatches skills one at a time
+to the always-open IsaacLab session; the Monitor confirms each before the next.
 
-```bash
-# ── Terminal 1 · Redis (the cross-process bus) ───────────────────────────
-redis-server
+No GPU? Smoke-test the worker path: `cd agentbot && uv run python -m agentbot.vla.sim_session --selftest` (needs a GR00T server) or the in-proc demo (A).
 
-# ── Terminal 2 · Core + Console (uv venv) ────────────────────────────────
-cd agentbot && uv run uvicorn agentbot.api.app:app --port 8780
-
-# ── Terminal 3 · VLA worker, in env_isaaclab (it imports IsaacLab) ───────
-#   install the agentbot package INTO env_isaaclab once — run this in the
-#   agentbot/ folder (NOT in IsaacLab/), so `agentbot` is importable there:
-conda activate env_isaaclab
-cd agentbot && pip install -e .
-python -m agentbot.vla.worker        # dequeues VLA tasks → runs the IsaacLab rollout
-```
-
-No GPU handy? Check the worker plumbing without IsaacLab:
-`cd agentbot && uv run python -m agentbot.vla.worker --fake --selftest`
+---
 
 ## Configuration
 
-Copy `config/agentbot.example.yaml` → `config/agentbot.yaml` (gitignored) and edit. Key knobs: `llm.backend`
-(`qwen-vl` | `claude` | `openai`), `backbone` (`in-proc` | `redis`), and the **swappable checkpoint registry**.
+**Everything configurable lives in one file: `config/agentbot.yaml`** (copy it from
+`config/agentbot.example.yaml`; it's gitignored). **Every option is documented inline in that file** — there's
+nothing to look up here. The big three: `backbone` (`in-proc` | `redis`), `vlm.backend` (the Brain model), and the
+**swappable checkpoint registry** (`vla.checkpoints` + `default_checkpoint`; never hardcoded — change it there or
+override per request with a `checkpoint` field).
 
-### Swap the checkpoint
+---
 
-The model path is **never hardcoded** — it lives in `vla.checkpoints` with a `default_checkpoint` pointer.
-Three ways to swap:
+## Code structure & reading guide
 
-```yaml
-vla:
-  default_checkpoint: n17_150k_lr1e4_absolute     # ← change this, or
-  checkpoints:
-    n17_150k_lr1e4_absolute: artifacts/checkpoints/gr00t/N1_7_fft_0615_150k_lr1e4_absolute_no_tune_visual
-    n17_150k_lr5e5:          artifacts/checkpoints/gr00t/N1_7_fft_0614_150k_lr5e5_no_tune_visual  # ← add entries
+```
+agentbot/agentbot/
+  contracts/        ← THE PROTOCOL. Pydantic models crossing every boundary. Read this first.
+      common·messages·skills·vla·events·commands
+  brain/            ← block 2. The "thinking" layer.
+      gateway·agent·orchestrator·vlm_client·memory/
+  skills/           ← block 4. Semantic action tools (sort_can, pour_water) + registry.
+  vla/              ← block 5. GR00T + IsaacLab execution.
+      sim_session (persistent, Phase 2)·isaac_runner (one-shot, Phase 1)·policy_server·worker·backends/
+  monitor/          ← block 3. event_bus·state_store·job_queue·command_queue·results·safety·success_judge·ingest
+  records/          ← SQLite task-management store (commands, skill_runs, stats).
+  api/              ← FastAPI: app·deps (composition root)·routes_{chat,commands,skills,vla,events}.
+  ui/console.html   ← the hierarchical dashboard (vanilla, served at /).
 ```
 
-```bash
-# ← or override per request (registry name or a literal path):
-curl -X POST :8780/v1/skills/sort_can/invoke \
-  -d '{"args":{"target_color":"orange"},"checkpoint":"n17_150k_lr5e5"}'
-```
+**Reading order for a newcomer:** `contracts/` (the vocabulary) → `brain/orchestrator.py` (the command loop) →
+`vla/sim_session.py` (how a skill becomes a real episode) → `api/deps.py` (how it's all wired) → `ui/console.html`.
 
-## HTTP API
+---
+
+## HTTP API (the dashboard uses these)
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/v1/chat` | user message → `AgentResponse` (+ `SkillPlan`) |
-| WS | `/v1/chat/stream` | streaming dialogue |
-| GET | `/v1/skills` | registered skills (as LLM tool schemas) |
-| POST | `/v1/skills/{name}/invoke` | validate + dispatch a skill to the VLA engine |
-| POST/GET | `/v1/vla/tasks[/{id}]` | submit / read a VLA task |
-| GET | `/v1/vla/checkpoints` | the swappable checkpoint registry |
-| GET | `/v1/state` · WS `/v1/events` | Monitor snapshot + live event stream |
+| POST · GET · DELETE | `/v1/commands[/{id}]` | enqueue a command · list/history · drill-down · clear queue |
+| GET | `/v1/stats` | per-skill success rate + counts (task management) |
+| POST | `/v1/control/{stop,estop}` | stop the orchestrator / trip the safety watchdog |
+| GET | `/v1/skills` · `/v1/vla/checkpoints` | registered skills · the checkpoint registry |
+| GET | `/v1/state` · WS `/v1/events` | Monitor live snapshot · live event stream |
+| POST | `/v1/chat` · `/v1/skills/{name}/invoke` | one-shot plan preview · dispatch a single skill |

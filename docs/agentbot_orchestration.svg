@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 540" font-family="-apple-system,'Segoe UI',Roboto,'PingFang TC','Microsoft JhengHei','Noto Sans CJK TC','Noto Serif CJK TC',sans-serif" role="img" aria-label="AgentBot 命令編排生命週期">
+  <defs>
+    <style>
+      .h{font-weight:700;font-size:14.5px;fill:#1f2937}
+      .s{font-size:11.5px;fill:#5f6f82}
+      .lab{font-size:10.8px;font-family:ui-monospace,Menlo,Consolas,monospace;paint-order:stroke;stroke:#eef2f7;stroke-width:4;stroke-linejoin:round}
+      .flow{fill:none;stroke-width:1.85;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:7 7;animation:dash .9s linear infinite}
+      .ctl{stroke:#475569} .ex{stroke:#8b5cf6} .ev{stroke:#10b981} .rec{stroke:#64748b}
+      .rt{fill:none;stroke:#f59e0b;stroke-width:1.85;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:7 7;animation:dash 1.3s linear infinite}
+      .ico{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+      rect[stroke]{filter:url(#cardShadow);stroke-opacity:.86}
+      .labelBox{filter:none;fill:#f8fafc;stroke:#dbe4f0;stroke-width:.8;opacity:.96}
+      .legendBox{filter:url(#cardShadow);fill:#fff;stroke:#d6deea;stroke-width:1;stroke-opacity:.9}
+      @keyframes dash{to{stroke-dashoffset:-16}}
+      @media (prefers-reduced-motion: reduce){.flow,.rt{animation:none}}
+    </style>
+    <filter id="cardShadow" x="-8%" y="-12%" width="116%" height="128%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.08"/></filter>
+    <symbol id="ico-screen" viewBox="0 0 24 24"><rect class="ico" x="4" y="5" width="16" height="12" rx="2"/><path class="ico" d="M9 20h6M12 17v3"/></symbol>
+    <symbol id="ico-queue" viewBox="0 0 24 24"><path class="ico" d="M6 7h12M6 12h12M6 17h8"/><circle class="ico" cx="18" cy="17" r="1.4"/></symbol>
+    <symbol id="ico-brain" viewBox="0 0 24 24"><path class="ico" d="M8 17V8.5a3 3 0 0 1 5.2-2.1A3.4 3.4 0 0 1 19 8.8V17a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3Z"/><path class="ico" d="M12 7v13M8 11h4M12 14h5"/></symbol>
+    <symbol id="ico-run" viewBox="0 0 24 24"><rect class="ico" x="4" y="5" width="16" height="14" rx="2"/><path class="ico" d="m10 9 5 3-5 3Z"/></symbol>
+    <symbol id="ico-monitor" viewBox="0 0 24 24"><path class="ico" d="M4 13h4l2-5 4 10 2-5h4"/><path class="ico" d="M4 19h16"/></symbol>
+    <symbol id="ico-record" viewBox="0 0 24 24"><path class="ico" d="M7 4h8l3 3v13H7Z"/><path class="ico" d="M15 4v4h3M9 12h6M9 16h6"/></symbol>
+    <symbol id="ico-check" viewBox="0 0 24 24"><circle class="ico" cx="12" cy="12" r="8"/><path class="ico" d="m8.5 12.5 2.4 2.4 4.8-5.2"/></symbol>
+    <marker id="mc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.8" markerHeight="4.8" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#475569"/></marker>
+    <marker id="mx" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.8" markerHeight="4.8" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8b5cf6"/></marker>
+    <marker id="me" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.8" markerHeight="4.8" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#10b981"/></marker>
+    <marker id="ma" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.8" markerHeight="4.8" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#f59e0b"/></marker>
+  </defs>
+
+  <rect x="0" y="0" width="1180" height="540" fill="#eef2f7" rx="18"/>
+  <text x="40" y="38" font-size="20" font-weight="800" fill="#0f172a">AgentBot · 命令編排生命週期（Phase 2）</text>
+  <text x="40" y="59" class="s">一句命令 → 大腦拆成有序 atomic skills → 常駐 IsaacLab 逐一執行（Monitor 把關，失敗重試/重規劃）→ 全程紀錄 → done。虛線＝資料流方向。</text>
+
+  <!-- 1 UI -->
+  <rect x="40" y="84" width="180" height="62" rx="14" fill="#fff" stroke="#7dd3fc" stroke-width="1.35"/>
+  <use href="#ico-screen" x="188" y="96" width="18" height="18" color="#0ea5e9"/>
+  <text class="h" x="60" y="110">1 · UI / Dashboard</text><text class="s" x="60" y="130">輸入命令</text>
+  <!-- 2 command queue -->
+  <rect x="268" y="84" width="200" height="62" rx="14" fill="#fff8ed" stroke="#fdba74" stroke-width="1.35"/>
+  <use href="#ico-queue" x="432" y="96" width="18" height="18" color="#f59e0b"/>
+  <text class="h" x="288" y="110">2 · 命令佇列</text><text class="s" x="288" y="130">Redis List · FIFO（可清除）</text>
+  <!-- 3 orchestrator -->
+  <rect x="516" y="72" width="300" height="92" rx="14" fill="#f2f5ff" stroke="#a5b4fc" stroke-width="1.55"/>
+  <use href="#ico-brain" x="782" y="88" width="19" height="19" color="#6366f1"/>
+  <text class="h" x="536" y="98">3 · Brain Orchestrator</text>
+  <text class="s" x="536" y="118">取最舊命令 → VLM 拆解 → SkillPlan</text>
+  <text class="s" x="536" y="136">（逐一派 skill、Monitor 把關才推進）</text>
+  <!-- skillplan chips -->
+  <rect x="516" y="178" width="300" height="36" rx="11" fill="#fff" stroke="#d8e0ff"/>
+  <text class="s" x="536" y="201">SkillPlan = [ skill₁ → skill₂ → … ]（有序）</text>
+
+  <!-- ===== execution cycle ===== -->
+  <!-- 4 job queue -->
+  <rect x="268" y="312" width="200" height="64" rx="14" fill="#f7f5ff" stroke="#c4b5fd" stroke-width="1.35"/>
+  <use href="#ico-queue" x="432" y="324" width="18" height="18" color="#8b5cf6"/>
+  <text class="h" x="288" y="338">4 · VLA Job Queue</text><text class="s" x="288" y="358">Redis List · vla:tasks</text>
+  <!-- 5 sim_session -->
+  <rect x="516" y="300" width="320" height="88" rx="14" fill="#f7f5ff" stroke="#c4b5fd" stroke-width="1.55"/>
+  <use href="#ico-run" x="800" y="316" width="19" height="19" color="#8b5cf6"/>
+  <text class="h" x="536" y="326">5 · 常駐 sim_session</text>
+  <text class="s" x="536" y="346">IsaacLab 全程開著 · 跑一集</text>
+  <text class="s" x="536" y="364">obs → get_action → step ×16 → task_done</text>
+  <!-- 6 monitor confirm -->
+  <rect x="884" y="304" width="256" height="78" rx="14" fill="#effdf6" stroke="#86efac" stroke-width="1.35"/>
+  <use href="#ico-monitor" x="1104" y="318" width="18" height="18" color="#10b981"/>
+  <text class="h" x="904" y="330" fill="#047857">6 · Monitor 確認</text>
+  <text class="s" x="904" y="350">ResultWaiter + task_done</text>
+  <text class="s" x="904" y="368">（小 VLM judge：成功/失敗/不確定）</text>
+
+  <!-- 7 records -->
+  <rect x="40" y="422" width="300" height="58" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="1.35"/>
+  <use href="#ico-record" x="306" y="434" width="18" height="18" color="#64748b"/>
+  <text class="h" x="60" y="448">7 · Records（History）</text><text class="s" x="60" y="468">commands · skill_runs · stats（SQLite）</text>
+  <!-- done -->
+  <rect x="884" y="422" width="256" height="58" rx="14" fill="#f0fdf4" stroke="#86efac" stroke-width="1.45"/>
+  <use href="#ico-check" x="1104" y="434" width="18" height="18" color="#10b981"/>
+  <text class="h" x="904" y="448" fill="#047857">命令 DONE → idle/等待</text><text class="s" x="904" y="468">全部 skill 完成；無新命令則回等待</text>
+
+  <!-- ===== flows ===== -->
+  <path class="flow ctl" d="M220,115 H268" marker-end="url(#mc)"/>
+  <rect class="labelBox" x="222" y="94" width="38" height="17" rx="7"/><text class="lab" x="230" y="106" fill="#475569">POST</text>
+  <path class="flow ctl" d="M468,115 H516" marker-end="url(#mc)"/>
+  <rect class="labelBox" x="470" y="94" width="30" height="17" rx="7"/><text class="lab" x="478" y="106" fill="#475569">pop</text>
+  <!-- orchestrator -> job queue (down-left) -->
+  <path class="flow ex" d="M620,214 V244 Q620,252 612,252 H376 Q368,252 368,260 V312" marker-end="url(#mx)"/>
+  <rect class="labelBox" x="392" y="262" width="118" height="18" rx="7"/><text class="lab" x="402" y="275" fill="#7c3aed">LPUSH vla:tasks</text>
+  <!-- job queue -> sim_session -->
+  <path class="flow ex" d="M468,344 H516" marker-end="url(#mx)"/>
+  <rect class="labelBox" x="472" y="322" width="42" height="17" rx="7"/><text class="lab" x="480" y="334" fill="#7c3aed">RPOP</text>
+  <!-- sim_session -> monitor -->
+  <path class="flow ev" d="M836,344 H884" marker-end="url(#me)"/>
+  <rect class="labelBox" x="842" y="276" width="86" height="17" rx="7"/><text class="lab" x="850" y="288" fill="#059669">XADD result</text>
+  <!-- monitor -> orchestrator (loop-back, Monitor-gated advance) -->
+  <path class="rt" d="M1012,304 V240 Q1012,232 1004,232 H848 Q840,232 840,224 V204 Q840,196 832,196 H816" marker-end="url(#ma)"/>
+  <rect class="labelBox" x="858" y="200" width="92" height="18" rx="7"/><text class="lab" x="866" y="213" fill="#b45309">✓ 下一個 skill</text>
+  <rect class="labelBox" x="858" y="244" width="164" height="18" rx="7"/><text class="lab" x="866" y="257" fill="#b45309">✗ 重試 N → 重規劃 / 中止</text>
+  <!-- orchestrator -> records -->
+  <path class="flow rec" d="M516,154 H494 Q486,154 486,162 V236 Q486,244 478,244 H198 Q190,244 190,252 V422" marker-end="url(#mc)"/>
+  <rect class="labelBox" x="204" y="224" width="78" height="18" rx="7"/><text class="lab" x="214" y="237" fill="#475569">紀錄每一步</text>
+  <!-- orchestrator -> done -->
+  <path class="flow ev" d="M816,140 H1148 Q1156,140 1156,148 V443 Q1156,451 1148,451 H1140" marker-end="url(#me)"/>
+
+  <!-- legend -->
+  <rect class="legendBox" x="40" y="500" width="1100" height="30" rx="14"/>
+  <text class="s" x="58" y="519" font-weight="700" fill="#334155">圖例</text>
+  <line x1="112" y1="515" x2="142" y2="515" stroke="#475569" stroke-width="2.4" stroke-dasharray="8 7"/><text class="s" x="150" y="519">control（命令/紀錄）</text>
+  <line x1="310" y1="515" x2="340" y2="515" stroke="#8b5cf6" stroke-width="2.4" stroke-dasharray="8 7"/><text class="s" x="348" y="519">skill 派工</text>
+  <line x1="456" y1="515" x2="486" y2="515" stroke="#10b981" stroke-width="2.4" stroke-dasharray="8 7"/><text class="s" x="494" y="519">結果/完成</text>
+  <line x1="602" y1="515" x2="632" y2="515" stroke="#f59e0b" stroke-width="2.4" stroke-dasharray="7 7"/><text class="s" x="640" y="519">推進/重試</text>
+  <circle cx="790" cy="515" r="5" fill="#0ea5e9"/><text class="s" x="802" y="519">UI</text>
+  <circle cx="842" cy="515" r="5" fill="#6366f1"/><text class="s" x="854" y="519">Brain</text>
+  <circle cx="916" cy="515" r="5" fill="#8b5cf6"/><text class="s" x="928" y="519">VLA</text>
+  <circle cx="976" cy="515" r="5" fill="#10b981"/><text class="s" x="988" y="519">Monitor / done</text>
+</svg>

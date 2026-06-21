@@ -3,395 +3,299 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AgentBot — console</title>
+<title>AgentBot · Dashboard</title>
 <style>
-:root{--bg:#0f1419;--panel:#171d26;--text:#e6edf3;--muted:#8b98a5;--accent:#6ea8fe;
---border:#2a3441;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--track:#222b36;}
-[data-theme=light]{--bg:#f6f8fa;--panel:#fff;--text:#1f2328;--muted:#656d76;
---accent:#0969da;--border:#d0d7de;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;--track:#eaeef2;}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);
-font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-.wrap{max-width:980px;margin:0 auto;padding:20px}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-h1{font-size:20px;margin:0}.sub{color:var(--muted);font-size:13px}
-h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:18px 0 10px}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
-.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.chip{padding:6px 12px;border-radius:20px;border:1px solid var(--border);font-size:13px;
-background:var(--panel);display:flex;align-items:center;gap:6px}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
-.running .dot,.succeeded .dot,.done .dot{background:var(--ok)}
-.queued .dot{background:var(--warn);animation:pulse 1.2s infinite}
-.failed .dot,.blocked .dot{background:var(--bad)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.tabs{display:flex;gap:6px;margin:14px 0}
-.tabs button{background:var(--panel);color:var(--muted);border:1px solid var(--border);
-border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px}
-.tabs button.active{color:var(--text);border-color:var(--accent)}
-.tab{display:none}.tab.active{display:block}
+:root{--bg:#0f1419;--panel:#171d26;--panel2:#1c2430;--text:#e6edf3;--muted:#8b98a5;--accent:#6ea8fe;
+--border:#2a3441;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--track:#222b36;--rail:#10141b;}
+[data-theme=light]{--bg:#f6f8fa;--panel:#fff;--panel2:#f3f5f8;--text:#1f2328;--muted:#656d76;
+--accent:#0969da;--border:#d0d7de;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;--track:#eaeef2;--rail:#f0f2f5;}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);
+font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,"PingFang TC","Microsoft JhengHei",sans-serif}
+/* layout: topbar + (sidebar | main) */
+.app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex-wrap:wrap}
+.brand{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+.brand .blip{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(63,185,80,.5);animation:ping 2s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(63,185,80,.4)}70%{box-shadow:0 0 0 7px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+.spacer{flex:1}
+.ctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.btn{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.bad{border-color:var(--bad);color:var(--bad)} .btn.warn{border-color:var(--warn);color:var(--warn)}
+.btn.estop{background:var(--bad);color:#fff;border-color:var(--bad);font-weight:700}
+select,input{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font:inherit}
+.pill{font-size:11px;padding:2px 9px;border-radius:12px;border:1px solid var(--border);color:var(--muted)}
+.body{display:grid;grid-template-columns:248px 1fr;min-height:0}
+.body.collapsed{grid-template-columns:0 1fr}
+/* sidebar */
+.side{background:var(--rail);border-right:1px solid var(--border);overflow:auto;padding:10px 8px}
+.body.collapsed .side{display:none}
+.navh{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:12px 8px 4px}
+.nav{list-style:none;margin:0;padding:0}
+.nav li{margin:1px 0}
+.nav .item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--text);font-size:13.5px}
+.nav .item:hover{background:var(--track)}
+.nav .item.active{background:var(--panel2);box-shadow:inset 2px 0 0 var(--accent)}
+.nav .item .ico{width:16px;text-align:center;opacity:.85}
+.nav .item .cnt{margin-left:auto;font-size:11px;color:var(--muted)}
+.nav .caret{transition:transform .15s;font-size:10px;color:var(--muted)}
+.nav .caret.open{transform:rotate(90deg)}
+.subtree{list-style:none;margin:0;padding:0 0 4px 14px;display:none}
+.subtree.open{display:block}
+.subtree .item{font-size:12.5px;padding:5px 10px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.queued .dot{background:var(--warn)} .running .dot{background:var(--accent);animation:pulse 1.1s infinite}
+.done .dot,.succeeded .dot{background:var(--ok)} .failed .dot,.cleared .dot{background:var(--bad)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+/* main */
+.main{overflow:auto;padding:18px 22px;min-width:0}
+h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.grid{display:grid;gap:14px}.g3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.g2{grid-template-columns:1fr 1fr}
+@media(max-width:760px){.g2{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+.card h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.stat{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:14px;border:1px solid var(--border);font-size:12.5px;background:var(--panel)}
 table{width:100%;border-collapse:collapse;font-size:13px}
-td,th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
-th{color:var(--muted)}
-button.toggle,button.act{background:var(--panel);color:var(--text);border:1px solid var(--border);
-border-radius:8px;padding:7px 11px;cursor:pointer}
-button.act{border-color:var(--accent)}
-button.danger{border-color:var(--bad);color:var(--bad)}
-button.warn-btn{border-color:var(--warn);color:var(--warn)}
-canvas{max-height:220px}
-input,select,textarea{background:var(--bg);color:var(--text);border:1px solid var(--border);
-border-radius:8px;padding:8px;font:inherit}
-textarea{width:100%;min-height:54px;resize:vertical}
-.log{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;max-height:260px;overflow:auto}
+td,th{text-align:left;padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px}
+tr.clk{cursor:pointer}tr.clk:hover{background:var(--track)}
+.statusbadge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:12px;border:1px solid var(--border);font-size:12px;white-space:nowrap}
+.log{font:11.5px/1.55 ui-monospace,Menlo,Consolas,monospace;max-height:300px;overflow:auto}
 .log div{padding:2px 0;border-bottom:1px solid var(--track)}
 .muted{color:var(--muted)}.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-.bubble{padding:8px 12px;border-radius:10px;border:1px solid var(--border);margin:6px 0;max-width:80%}
-.bubble.user{margin-left:auto;border-color:var(--accent)}
-.pill{font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid var(--border);color:var(--muted)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:680px){.grid2{grid-template-columns:1fr}}
-/* status chips for command queue */
-.status-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:2px 8px;
-border-radius:12px;border:1px solid var(--border);white-space:nowrap}
-.status-chip.queued{border-color:var(--warn);color:var(--warn)}
-.status-chip.queued .dot{background:var(--warn);animation:pulse 1.2s infinite}
-.status-chip.running{border-color:var(--ok);color:var(--ok)}
-.status-chip.running .dot{background:var(--ok)}
-.status-chip.done{border-color:var(--ok);color:var(--ok)}
-.status-chip.done .dot{background:var(--ok)}
-.status-chip.failed{border-color:var(--bad);color:var(--bad)}
-.status-chip.failed .dot{background:var(--bad)}
-.status-chip.cleared{border-color:var(--muted);color:var(--muted)}
-.status-chip.cleared .dot{background:var(--muted)}
-/* command queue rows */
-.cmd-row{padding:6px 4px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
-.cmd-row:hover{background:var(--track)}
-.cmd-row:last-child{border-bottom:none}
-.cmd-text{font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmd-ts{font-size:11px;color:var(--muted);white-space:nowrap}
-/* skill runs detail */
-.skill-runs{padding:6px 12px 6px 24px;background:var(--track);border-bottom:1px solid var(--border);display:none}
-.skill-runs.open{display:block}
-.skill-run-row{font-size:12px;padding:3px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.cmd-queue-empty{text-align:center;color:var(--muted);padding:16px;font-size:13px}
+.timeline{display:flex;flex-direction:column;gap:6px}
+.tl-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--panel2)}
+.bar{height:10px;border-radius:6px;background:var(--track);overflow:hidden;min-width:60px;flex:1}
+.bar>div{height:100%;background:linear-gradient(90deg,var(--ok),#67d089)}
+canvas{max-height:230px}
+.inputbar{display:flex;gap:8px;margin-top:12px}
+.empty{color:var(--muted);text-align:center;padding:24px;font-size:13px}
+a{color:var(--accent)}
 </style>
 <script src="/vendor/chart.umd.min.js"></script>
-<script>
-(function(){var k='agentbot-theme',t=localStorage.getItem(k)||'dark';
+<script>(function(){var k='agentbot-theme',t=localStorage.getItem(k)||'dark';
 document.documentElement.setAttribute('data-theme',t);
-window.__toggle=function(){t=t==='dark'?'light':'dark';
-document.documentElement.setAttribute('data-theme',t);localStorage.setItem(k,t);};})();
-</script>
+window.__toggle=function(){t=t==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',t);localStorage.setItem(k,t);};})();</script>
 </head>
-<body><div class="wrap">
-<header>
-  <div><h1>AgentBot — console</h1><div class="sub" id="sub">read-only · connecting…</div></div>
-  <div class="row">
+<body>
+<div class="app">
+  <!-- ── top bar / control bar ── -->
+  <div class="topbar">
+    <div class="brand"><span class="blip"></span>AgentBot · Dashboard</div>
     <span class="pill" id="connpill">events: …</span>
-    <button class="toggle" onclick="window.__toggle()">◐ theme</button>
-  </div>
-</header>
-
-<div class="tabs">
-  <button class="active" data-tab="monitor">Monitor</button>
-  <button data-tab="chat">Chat</button>
-  <button data-tab="commands">Commands</button>
-  <button data-tab="history">History</button>
-  <button data-tab="memory">Memory</button>
-</div>
-
-<!-- ───────────── Monitor (block 3) ───────────── -->
-<section class="tab active" id="tab-monitor">
-  <div class="grid2">
-    <div class="panel"><h2>Live state</h2><div id="state" class="row"></div></div>
-    <div class="panel"><h2>VLA telemetry</h2><canvas id="chart"></canvas></div>
-  </div>
-  <div class="panel"><h2>Active VLA tasks</h2><div id="tasks" class="muted">none yet</div></div>
-  <div class="panel"><h2>Event stream</h2><div id="log" class="log"></div></div>
-</section>
-
-<!-- ───────────── Chat (command enqueue) ───────────── -->
-<section class="tab" id="tab-chat">
-  <div class="panel">
-    <h2>Send command</h2>
-    <div id="chatlog"></div>
-    <div class="row" style="margin-top:10px">
-      <input id="msg" style="flex:1;min-width:240px" placeholder="e.g. sort the can onto the orange plate" />
+    <span class="pill" id="statepill">idle</span>
+    <div class="spacer"></div>
+    <div class="ctl">
       <select id="ckpt" title="checkpoint (swappable)"></select>
-      <button class="act" onclick="sendCommand()">Enqueue</button>
+      <button class="btn warn" onclick="clearQueue()" title="Delete pending commands">✕ Clear queue</button>
+      <button class="btn bad" onclick="stopOrch()" title="Stop orchestrator + clear queue">■ Stop</button>
+      <button class="btn estop" onclick="estop()" title="Emergency stop (trips SafetyWatchdog)">⛔ E-STOP</button>
+      <button class="btn" onclick="window.__toggle()">◐</button>
+      <button class="btn" onclick="document.querySelector('.body').classList.toggle('collapsed')" title="toggle sidebar">☰</button>
     </div>
-    <div class="sub muted" style="margin-top:6px">Command is enqueued immediately; the Brain processes it asynchronously. Check the <b>Commands</b> tab for status and results.</div>
   </div>
-</section>
 
-<!-- ───────────── Commands (queue / history panel) ───────────── -->
-<section class="tab" id="tab-commands">
-  <div class="panel">
-    <div class="row" style="justify-content:space-between;margin-bottom:8px">
-      <h2 style="margin:0">Command queue &amp; history</h2>
-      <div class="row" style="gap:6px">
-        <button class="act warn-btn" onclick="clearQueue()" title="Delete all pending (queued) commands">Clear queue</button>
-        <button class="act danger" onclick="stopOrchestrator()" title="Stop orchestrator and clear queue">⏹ Stop</button>
+  <div class="body">
+    <!-- ── sidebar / navigator (hierarchical) ── -->
+    <aside class="side">
+      <div class="navh">Navigator</div>
+      <ul class="nav" id="nav">
+        <li><div class="item active" data-view="system"><span class="ico">🖥</span>System</div></li>
+        <li><div class="item" data-view="monitor"><span class="ico">📡</span>Monitor</div></li>
+        <li>
+          <div class="item" data-view="commands"><span class="caret" id="cmdcaret">▸</span><span class="ico">📋</span>Commands<span class="cnt" id="cmdcnt"></span></div>
+          <ul class="subtree" id="cmdtree"></ul>
+        </li>
+        <li><div class="item" data-view="skills"><span class="ico">🧩</span>Skills<span class="cnt" id="skillcnt"></span></div></li>
+        <li><div class="item" data-view="stats"><span class="ico">📊</span>Stats</div></li>
+        <li><div class="item" data-view="memory"><span class="ico">🧠</span>Memory</div></li>
+      </ul>
+      <div class="navh">New command</div>
+      <div style="padding:0 6px">
+        <textarea id="cmdbox" rows="2" style="width:100%;resize:vertical" placeholder="e.g. sort the can onto the orange plate"></textarea>
+        <button class="btn" style="width:100%;margin-top:6px;border-color:var(--accent)" onclick="postCommand()">▸ Enqueue</button>
+        <div class="muted" style="font-size:11px;margin-top:6px">Enqueued immediately; the Brain runs it async.</div>
       </div>
-    </div>
-    <div id="cmd-list"><div class="cmd-queue-empty">No commands yet. Send one in the Chat tab.</div></div>
+    </aside>
+
+    <!-- ── main pane ── -->
+    <main class="main" id="main"></main>
   </div>
-</section>
-
-<!-- ───────────── History ───────────── -->
-<section class="tab" id="tab-history">
-  <div class="panel"><h2>VLA task history</h2><table id="histtable"><thead><tr><th>task</th><th>name</th><th>status</th><th>checkpoint</th></tr></thead><tbody></tbody></table></div>
-</section>
-
-<!-- ───────────── Memory ───────────── -->
-<section class="tab" id="tab-memory">
-  <div class="panel"><h2>Registered skills (block 4 — also the Brain's tools)</h2><div id="skills"></div></div>
-  <div class="panel"><h2>Stores</h2><div class="muted">
-    <b>Monitor (3)</b> = Redis events + live state (this page) ·
-    <b>Memory (2)</b> = SQLite conversation/episodic + vector RAG (the Brain) ·
-    <b>Console</b> reads both. See <span class="mono">docs/agentbot_architecture.html</span>.
-  </div></div>
-</section>
-
-<div class="sub muted" style="margin-top:8px">Monitor (3) = real-time · Memory (2) = cognitive · Console = visualization. AgentBot v0.1 scaffold.</div>
 </div>
 
 <script>
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const SID='console-'+Math.random().toString(36).slice(2,8);
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const SID='dash-'+Math.random().toString(36).slice(2,8);
+let VIEW='system', SELCMD=null, telemetry={l:[],d:[]}, chart=null, statsChart=null;
+async function jget(u){try{return await (await fetch(u)).json()}catch(e){return null}}
+async function jpost(u,b){try{return await (await fetch(u,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b||{})})).json()}catch(e){return null}}
+async function jdel(u){try{return await (await fetch(u,{method:'DELETE'})).json()}catch(e){return null}}
+const badge=s=>`<span class="statusbadge ${s||''}"><span class="dot"></span>${s||'?'}</span>`;
+const ts=t=>t?new Date(t*1000).toLocaleTimeString():'';
 
-// tabs
-$$('.tabs button').forEach(b=>b.onclick=()=>{
-  $$('.tabs button').forEach(x=>x.classList.remove('active'));
-  $$('.tab').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); $('#tab-'+b.dataset.tab).classList.add('active');
-});
-
-// telemetry chart
-const chart=new Chart($('#chart'),{type:'line',
-  data:{labels:[],datasets:[{label:'inference latency (s)',data:[],borderColor:'#6ea8fe',tension:.3,pointRadius:0}]},
-  options:{animation:false,scales:{x:{title:{display:true,text:'step'}}},plugins:{legend:{labels:{color:'#8b98a5'}}}}});
-
-function logLine(t){const d=document.createElement('div');d.textContent=t;
-  const L=$('#log');L.prepend(d);while(L.children.length>200)L.lastChild.remove();}
-
-// live state poll
-async function poll(){
-  try{const s=await (await fetch('/v1/state')).json();
-    const el=$('#state'); el.innerHTML='';
-    const keys=['robot_state','system_status','safety','environment'];
-    let any=false;
-    keys.forEach(k=>{if(s[k]){any=true;const v=s[k];
-      const c=document.createElement('span');c.className='chip '+(v.mode||v.status||'');
-      c.innerHTML=`<span class="dot"></span>${k}: <b>${v.mode||v.status||JSON.stringify(v).slice(0,40)}</b>`;
-      el.appendChild(c);}});
-    if(!any)el.innerHTML='<span class="muted">no state yet — send a command in Chat</span>';
-    // vla tasks + history
-    const tasks=Object.entries(s).filter(([k])=>k.startsWith('vla:'));
-    $('#tasks').innerHTML = tasks.length? tasks.map(([k,v])=>
-      `<span class="chip ${v.status||''}"><span class="dot"></span>${k.slice(4,16)} · <b>${v.status||'?'}</b>${v.success_rate!=null?' · sr '+v.success_rate:''}</span>`).join(' '):'<span class="muted">none yet</span>';
-    const tb=$('#histtable tbody'); tb.innerHTML=tasks.map(([k,v])=>
-      `<tr><td class="mono">${k.slice(4,16)}</td><td>${v.task_name||''}</td><td>${v.status||''}</td><td class="mono">${v.checkpoint_name||''}</td></tr>`).join('');
-    $('#sub').textContent='read-only · live';
-  }catch(e){$('#sub').textContent='read-only · API offline';}
+// ── navigation ──
+$$('#nav .item').forEach(it=>it.addEventListener('click',e=>{
+  const v=it.dataset.view; if(!v)return;
+  if(v==='commands'){const c=$('#cmdcaret');c.classList.toggle('open');$('#cmdtree').classList.toggle('open');}
+  setView(v);
+}));
+function setView(v,cmd){VIEW=v;SELCMD=cmd||null;
+  $$('#nav>li>.item').forEach(i=>i.classList.toggle('active',i.dataset.view===v));
+  render();
 }
-setInterval(poll,1500); poll();
+function render(){
+  if(VIEW==='system')renderSystem();
+  else if(VIEW==='monitor')renderMonitor();
+  else if(VIEW==='commands')SELCMD?renderCommandDetail(SELCMD):renderCommands();
+  else if(VIEW==='skills')renderSkills();
+  else if(VIEW==='stats')renderStats();
+  else if(VIEW==='memory')renderMemory();
+}
 
-// event stream (WS)
+// ── data caches refreshed by pollers ──
+let CMDS=[], STATE={}, STATS={}, SKILLS=[];
+
+async function poll(){
+  const [cmds,state,stats]=await Promise.all([jget('/v1/commands?n=50'),jget('/v1/state'),jget('/v1/stats')]);
+  if(cmds){CMDS=cmds.commands||[];$('#cmdcnt').textContent=CMDS.length;renderCmdTree();}
+  if(state){STATE=state;}
+  if(stats){STATS=stats;}
+  // top-bar state pill = orchestrator activity
+  const running=CMDS.find(c=>c.status==='running');
+  $('#statepill').textContent=running?'running · '+(running.text.slice(0,24)):'idle / waiting';
+  $('#statepill').className='pill '+(running?'running':'');
+  if(VIEW==='system'||VIEW==='monitor'||VIEW==='stats'||(VIEW==='commands'&&!SELCMD))render();
+}
+setInterval(poll,1500);
+
+function renderCmdTree(){
+  $('#cmdtree').innerHTML=CMDS.slice(0,12).map(c=>
+    `<li><div class="item ${c.status}" onclick="setView('commands','${c.command_id}')" title="${c.text.replace(/"/g,'&quot;')}">
+      <span class="dot"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.text.slice(0,22)}</span></div></li>`).join('')
+    || '<li class="muted" style="padding:6px 10px;font-size:12px">none yet</li>';
+}
+
+// ── views ──
+function renderSystem(){
+  const proc=(STATE['robot_state']||{}).mode||'—';
+  const vlaTasks=Object.keys(STATE).filter(k=>k.startsWith('vla:')).length;
+  $('#main').innerHTML=`
+   <h2>🖥 System overview</h2>
+   <div class="grid g3">
+     <div class="card"><h3>Commands</h3><div class="stat">${(STATS.commands??0)}</div><div class="muted">${STATS.done??0} done · ${STATS.failed??0} failed</div></div>
+     <div class="card"><h3>In queue / running</h3><div class="stat">${CMDS.filter(c=>c.status==='queued'||c.status==='running').length}</div><div class="muted">FIFO command queue</div></div>
+     <div class="card"><h3>VLA tasks seen</h3><div class="stat">${vlaTasks}</div><div class="muted">robot: ${proc}</div></div>
+   </div>
+   <div class="card" style="margin-top:14px"><h3>Pipeline (1 → 2 → 4 → 5, observed by 3)</h3>
+     <div class="grid g3" style="--c:1">
+       ${['1 User Input','2 Brain (VLM)','4 Skill Layer','5 VLA Engine','3 Monitor'].map((b,i)=>
+         `<div class="chip" style="justify-content:center;border-color:${['#0ea5e9','#6366f1','#8b5cf6','#8b5cf6','#10b981'][i]}">${b}</div>`).join('')}
+     </div>
+     <div class="muted" style="margin-top:10px;font-size:12px">Backbone: this dashboard reads the Monitor (live state + events) and Records (commands/stats). Detailed architecture → <a href="/" onclick="return false">agentbot/docs/agentbot_dashboard.html</a></div>
+   </div>`;
+}
+function renderMonitor(){
+  $('#main').innerHTML=`
+   <h2>📡 Monitor — live state &amp; events</h2>
+   <div class="grid g2">
+     <div class="card"><h3>Live state</h3><div id="livestate" class="grid" style="gap:8px"></div></div>
+     <div class="card"><h3>VLA telemetry (inference latency)</h3><canvas id="tchart"></canvas></div>
+   </div>
+   <div class="card" style="margin-top:14px"><h3>Event stream</h3><div id="evlog" class="log"></div></div>`;
+  const ls=$('#livestate');const keys=['robot_state','system_status','safety','environment'];
+  ls.innerHTML=keys.filter(k=>STATE[k]).map(k=>{const v=STATE[k];return `<span class="chip ${v.mode||v.status||''}"><span class="dot"></span>${k}: <b>${v.mode||v.status||JSON.stringify(v).slice(0,30)}</b></span>`}).join('')||'<span class="muted">no state yet — send a command</span>';
+  // VLA tasks
+  const vt=Object.entries(STATE).filter(([k])=>k.startsWith('vla:'));
+  if(vt.length)ls.innerHTML+=vt.map(([k,v])=>`<span class="chip ${v.status||''}"><span class="dot"></span>${k.slice(4,16)} · <b>${v.status||'?'}</b></span>`).join('');
+  $('#evlog').innerHTML=EVLOG.map(l=>`<div>${l}</div>`).join('');
+  drawTelemetry();
+}
+function renderCommands(){
+  $('#main').innerHTML=`
+   <h2>📋 Commands — queue &amp; history</h2>
+   <div class="card"><table><thead><tr><th>command</th><th>status</th><th>result</th><th>when</th></tr></thead>
+     <tbody>${CMDS.map(c=>`<tr class="clk" onclick="setView('commands','${c.command_id}')">
+       <td>${c.text}</td><td>${badge(c.status)}</td><td class="muted">${c.result_summary||''}</td><td class="muted mono">${ts(c.created_ts)}</td></tr>`).join('')
+       ||'<tr><td colspan=4 class="empty">No commands yet — enqueue one in the sidebar.</td></tr>'}</tbody></table></div>`;
+}
+async function renderCommandDetail(id){
+  const d=await jget('/v1/commands/'+id); if(!d||!d.command){$('#main').innerHTML='<div class="empty">not found</div>';return;}
+  const c=d.command, plan=c.plan_json?JSON.parse(c.plan_json):null, runs=d.skill_runs||[];
+  $('#main').innerHTML=`
+   <h2><span class="btn" style="padding:3px 9px;cursor:pointer" onclick="setView('commands')">← back</span> &nbsp; Command</h2>
+   <div class="card"><div style="font-size:15px;margin-bottom:6px">${c.text}</div>
+     ${badge(c.status)} <span class="muted">${c.result_summary||''}</span> <span class="muted mono" style="float:right">${ts(c.created_ts)}</span></div>
+   <div class="card" style="margin-top:12px"><h3>Plan (Brain decomposition)</h3>
+     ${plan&&plan.calls&&plan.calls.length?plan.calls.map((k,i)=>`<div class="chip" style="margin:3px 4px">${i+1}. ${k.name}(${JSON.stringify(k.args)})</div>`).join(''):'<span class="muted">no plan</span>'}</div>
+   <div class="card" style="margin-top:12px"><h3>Skill runs (Monitor-gated execution)</h3>
+     <div class="timeline">${runs.length?runs.map(r=>`
+       <div class="tl-row"><span class="dot ${r.status}"></span>
+         <b>${r.skill}</b> <span class="statusbadge ${r.status}">${r.status}</span>
+         <span class="muted">attempt ${r.attempt} · ${r.steps} steps · ${r.duration_s}s</span>
+         <div class="bar"><div style="width:${r.success?100:35}%;${r.success?'':'background:linear-gradient(90deg,var(--bad),#ff7b72)'}"></div></div>
+         <span>${r.success?'✓':'✗'}</span></div>`).join(''):'<span class="muted">no skill runs yet (running…)</span>'}</div></div>`;
+}
+function renderSkills(){
+  $('#main').innerHTML=`<h2>🧩 Skills — registered semantic action tools</h2>
+   <div class="card">${SKILLS.length?SKILLS.map(s=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+     <b>${s.name}</b> <span class="muted">— ${s.description}</span>
+     <div class="muted" style="font-size:12px;margin-top:3px">params: ${(s.params||[]).map(p=>p.name+(p.enum?' ['+p.enum.join('|')+']':'')).join(', ')||'none'} · embodiments: ${(s.embodiments||[]).join(',')}</div></div>`).join(''):'<span class="muted">loading…</span>'}</div>`;
+}
+function renderStats(){
+  $('#main').innerHTML=`<h2>📊 Stats — task management</h2>
+   <div class="grid g3"><div class="card"><h3>Total commands</h3><div class="stat">${STATS.commands??0}</div></div>
+     <div class="card"><h3>Done</h3><div class="stat" style="color:var(--ok)">${STATS.done??0}</div></div>
+     <div class="card"><h3>Failed</h3><div class="stat" style="color:var(--bad)">${STATS.failed??0}</div></div></div>
+   <div class="card" style="margin-top:14px"><h3>Per-skill success rate</h3><canvas id="schart"></canvas></div>`;
+  const per=STATS.per_skill||[];
+  const ctx=$('#schart'); if(ctx){if(statsChart)statsChart.destroy();
+    statsChart=new Chart(ctx,{type:'bar',data:{labels:per.map(p=>p.skill),
+      datasets:[{label:'success rate',data:per.map(p=>p.success_rate),backgroundColor:'#3fb950'},
+                {label:'runs',data:per.map(p=>p.runs),backgroundColor:'#6ea8fe',yAxisID:'y1'}]},
+      options:{scales:{y:{min:0,max:1,title:{display:true,text:'success rate'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'runs'}}},plugins:{legend:{labels:{color:getComputedStyle(document.body).getPropertyValue('--muted')}}}}});}
+}
+function renderMemory(){
+  $('#main').innerHTML=`<h2>🧠 Memory</h2>
+   <div class="card"><div class="muted">Brain memory (SQLite conversation + episodic, optional vector RAG) is distinct from the real-time Monitor.
+   Episodic history is summarized under <b>Stats</b> and per-command <b>Skill runs</b>. A dedicated memory browser + RAG view lands in Phase 2c.</div></div>`;
+}
+
+// ── telemetry chart (Monitor) ──
+function drawTelemetry(){const c=$('#tchart');if(!c)return;if(chart)chart.destroy();
+  chart=new Chart(c,{type:'line',data:{labels:telemetry.l,datasets:[{label:'latency (s)',data:telemetry.d,borderColor:'#6ea8fe',tension:.3,pointRadius:0}]},
+    options:{animation:false,scales:{x:{title:{display:true,text:'step'}}},plugins:{legend:{display:false}}}});}
+
+// ── events WS ──
+let EVLOG=[];
 function connect(){
   const ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/v1/events');
   ws.onopen=()=>$('#connpill').textContent='events: live';
   ws.onclose=()=>{$('#connpill').textContent='events: reconnecting';setTimeout(connect,1500);};
   ws.onmessage=m=>{const ev=JSON.parse(m.data);
-    logLine(`[${new Date(ev.ts*1000).toLocaleTimeString()}] ${ev.type} · ${ev.source} ${JSON.stringify(ev.payload).slice(0,80)}`);
-    if(ev.type==='vla_telemetry'&&ev.payload.step){
-      chart.data.labels.push(ev.payload.step);
-      chart.data.datasets[0].data.push(ev.payload.inference_latency_s);
-      if(chart.data.labels.length>60){chart.data.labels.shift();chart.data.datasets[0].data.shift();}
-      chart.update();}
+    EVLOG.unshift(`[${ts(ev.ts)}] ${ev.type} · ${ev.source} ${JSON.stringify(ev.payload).slice(0,70)}`);
+    if(EVLOG.length>150)EVLOG.pop();
+    if(ev.type==='vla_telemetry'&&ev.payload.step){telemetry.l.push(ev.payload.step);telemetry.d.push(ev.payload.inference_latency_s);
+      if(telemetry.l.length>80){telemetry.l.shift();telemetry.d.shift();}}
+    if(VIEW==='monitor')renderMonitor();
   };
 }
 connect();
 
-// skills + checkpoints
-async function loadSkills(){
-  const r=await (await fetch('/v1/skills')).json();
-  $('#skills').innerHTML=r.skills.map(s=>`<div style="margin:6px 0"><b>${s.name}</b> <span class="muted">— ${s.description}</span>
-    <div class="small muted">params: ${(s.params||[]).map(p=>p.name+(p.enum?' ['+p.enum.join('|')+']':'')).join(', ')||'none'}</div></div>`).join('');
-}
-async function loadCkpts(){
-  const r=await (await fetch('/v1/vla/checkpoints')).json();
-  $('#ckpt').innerHTML=Object.keys(r.checkpoints).map(n=>`<option ${n===r.default?'selected':''}>${n}</option>`).join('');
-}
-loadSkills(); loadCkpts();
+// ── control + input ──
+async function postCommand(){const t=$('#cmdbox').value.trim();if(!t)return;$('#cmdbox').value='';
+  await jpost('/v1/commands',{session_id:SID,text:t});poll();
+  if($('#cmdcaret'))$('#cmdcaret').classList.add('open'),$('#cmdtree').classList.add('open');}
+async function clearQueue(){const r=await jdel('/v1/commands');poll();}
+async function stopOrch(){await jpost('/v1/control/stop');poll();}
+async function estop(){if(confirm('Emergency stop — trip the SafetyWatchdog?'))await jpost('/v1/control/estop');}
+$('#cmdbox').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))postCommand();});
 
-// ─────────────────────────────────────────────────────────
-// COMMAND QUEUE UI
-// ─────────────────────────────────────────────────────────
+// ── checkpoints dropdown ──
+(async()=>{const r=await jget('/v1/vla/checkpoints');if(r)$('#ckpt').innerHTML=Object.keys(r.checkpoints||{}).map(n=>`<option ${n===r.default?'selected':''}>${n}</option>`).join('');})();
+(async()=>{const r=await jget('/v1/skills');if(r){SKILLS=r.skills||[];$('#skillcnt').textContent=SKILLS.length;}})();
 
-// Enqueue a command via POST /v1/commands, clear input immediately
-function addChatLine(text, cls) {
-  const b = document.createElement('div');
-  b.className = 'bubble ' + cls;
-  b.textContent = text;
-  $('#chatlog').appendChild(b);
-  b.scrollIntoView({block:'nearest'});
-}
-
-async function sendCommand() {
-  const inp = $('#msg');
-  const t = inp.value.trim();
-  if (!t) return;
-  inp.value = ''; // clear immediately so user can type next command
-  addChatLine(t, 'user');
-  try {
-    const r = await (await fetch('/v1/commands', {
-      method: 'POST',
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify({text: t, session_id: SID})
-    })).json();
-    if (r.command_id) {
-      addChatLine('Queued as ' + r.command_id.slice(0, 16) + '… — see Commands tab for status.', 'agent');
-      // switch to Commands tab so user sees the queue
-      // (don't force-switch; just refresh the list)
-      refreshCmdList();
-    } else {
-      addChatLine('Error: ' + JSON.stringify(r), 'agent');
-    }
-  } catch (e) {
-    addChatLine('Failed to enqueue: ' + e, 'agent');
-  }
-}
-
-$('#msg').addEventListener('keydown', e => { if (e.key === 'Enter') sendCommand(); });
-
-// ── Command list rendering ──
-
-// Track which command IDs have their skill_runs open
-const openIds = new Set();
-// Cache of fetched skill_runs per command_id
-const skillRunsCache = {};
-
-function fmtTs(ts) {
-  if (!ts) return '';
-  const d = new Date(ts * 1000);
-  return d.toLocaleTimeString();
-}
-
-function statusChip(status) {
-  return `<span class="status-chip ${status}"><span class="dot"></span>${status}</span>`;
-}
-
-function renderSkillRuns(runs) {
-  if (!runs || !runs.length) return '<div class="muted" style="font-size:12px">no skill runs recorded yet</div>';
-  return runs.map(r => `<div class="skill-run-row">
-    <span class="pill">${r.skill||'?'}</span>
-    <span>${statusChip(r.status||'?')}</span>
-    <span class="muted" style="font-size:12px">success: ${r.success ? '✓' : '✗'}</span>
-    <span class="muted" style="font-size:12px">steps: ${r.steps??'—'}</span>
-    <span class="muted" style="font-size:12px">attempt: ${r.attempt??1}</span>
-    ${r.duration_s != null ? `<span class="muted" style="font-size:12px">${r.duration_s.toFixed(2)}s</span>` : ''}
-  </div>`).join('');
-}
-
-async function toggleDetail(cmdId) {
-  const detEl = document.getElementById('runs-' + cmdId);
-  if (!detEl) return;
-  if (openIds.has(cmdId)) {
-    openIds.delete(cmdId);
-    detEl.classList.remove('open');
-  } else {
-    openIds.add(cmdId);
-    detEl.classList.add('open');
-    // Fetch skill runs if not cached
-    if (!skillRunsCache[cmdId]) {
-      detEl.innerHTML = '<div class="muted" style="font-size:12px;padding:4px">Loading…</div>';
-      try {
-        const d = await (await fetch('/v1/commands/' + encodeURIComponent(cmdId))).json();
-        skillRunsCache[cmdId] = d.skill_runs || [];
-      } catch (e) {
-        skillRunsCache[cmdId] = [];
-      }
-    }
-    detEl.innerHTML = renderSkillRuns(skillRunsCache[cmdId]);
-  }
-}
-
-function renderCmdList(cmds) {
-  const el = $('#cmd-list');
-  if (!cmds || !cmds.length) {
-    el.innerHTML = '<div class="cmd-queue-empty">No commands yet. Send one in the Chat tab.</div>';
-    return;
-  }
-  // Build HTML; preserve open state
-  el.innerHTML = cmds.map(c => {
-    const isOpen = openIds.has(c.command_id);
-    // Invalidate cache if status changed (running/done transitions)
-    // Simple heuristic: re-fetch if done/failed and cache exists
-    const needsRefresh = (c.status === 'done' || c.status === 'failed') && skillRunsCache[c.command_id];
-    if (needsRefresh) delete skillRunsCache[c.command_id];
-    return `<div class="cmd-row row" onclick="toggleDetail('${c.command_id}')" title="Click to toggle skill runs">
-      <span class="cmd-text">${escHtml(c.text)}</span>
-      ${statusChip(c.status || 'unknown')}
-      <span class="cmd-ts">${fmtTs(c.created_ts)}</span>
-    </div>
-    <div class="skill-runs ${isOpen ? 'open' : ''}" id="runs-${c.command_id}">
-      ${isOpen && skillRunsCache[c.command_id] ? renderSkillRuns(skillRunsCache[c.command_id]) : '<div class="muted" style="font-size:12px">Loading…</div>'}
-    </div>`;
-  }).join('');
-
-  // If any were open, re-fetch their skill_runs asynchronously
-  cmds.forEach(c => {
-    if (openIds.has(c.command_id) && !skillRunsCache[c.command_id]) {
-      fetch('/v1/commands/' + encodeURIComponent(c.command_id))
-        .then(r => r.json())
-        .then(d => {
-          skillRunsCache[c.command_id] = d.skill_runs || [];
-          const el2 = document.getElementById('runs-' + c.command_id);
-          if (el2 && el2.classList.contains('open')) el2.innerHTML = renderSkillRuns(skillRunsCache[c.command_id]);
-        })
-        .catch(() => {});
-    }
-  });
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-async function refreshCmdList() {
-  try {
-    const r = await (await fetch('/v1/commands?n=50')).json();
-    renderCmdList(r.commands);
-  } catch (e) {
-    // silently ignore if API is offline
-  }
-}
-
-// Poll every 1.5s
-setInterval(refreshCmdList, 1500);
-refreshCmdList();
-
-// ── Queue controls ──
-
-async function clearQueue() {
-  try {
-    const r = await (await fetch('/v1/commands', {method: 'DELETE'})).json();
-    // refresh immediately
-    await refreshCmdList();
-    // brief toast in the chatlog (user may be on Chat tab)
-    addChatLine('Cleared ' + (r.cleared ?? 0) + ' pending command(s) from queue.', 'agent');
-  } catch (e) {
-    addChatLine('Clear queue failed: ' + e, 'agent');
-  }
-}
-
-async function stopOrchestrator() {
-  try {
-    const r = await (await fetch('/v1/control/stop', {method: 'POST'})).json();
-    await refreshCmdList();
-    addChatLine('Orchestrator stopped. Queue cleared.', 'agent');
-  } catch (e) {
-    addChatLine('Stop failed: ' + e, 'agent');
-  }
-}
+poll(); render();
 </script>
 </body></html>

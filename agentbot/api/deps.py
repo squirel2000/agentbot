@@ -28,7 +28,10 @@ from agentbot.monitor.results import ResultWaiter
 from agentbot.monitor.safety import SafetyWatchdog
 from agentbot.monitor.state_store import InMemStateStore, RedisStateStore, StateStore
 from agentbot.records.store import Records
-from agentbot.settings import AppConfig, load_config
+from agentbot.settings import AppConfig, REPO_ROOT, load_config
+from agentbot.skills.builtin.home import HomeSkill
+from agentbot.skills.builtin.pick import PickSkill
+from agentbot.skills.builtin.place import PlaceSkill
 from agentbot.skills.builtin.pour_water import PourWaterSkill
 from agentbot.skills.builtin.sort_can import SortCanSkill
 from agentbot.skills.registry import SkillRegistry
@@ -54,11 +57,19 @@ class Deps:
         self.registry = SkillRegistry()
         self.registry.register(SortCanSkill())
         self.registry.register(PourWaterSkill())
+        # Composable atomic primitives (architecture.png block 4: "Pick, Place, …").
+        self.registry.register(PickSkill())
+        self.registry.register(PlaceSkill())
+        self.registry.register(HomeSkill())
 
-        store = MemoryStore(cfg.memory.sqlite_path)
+        # Resolve the sqlite path absolute (under REPO_ROOT if relative) so the DBs land in
+        # the same place regardless of the process's cwd (API vs sim_session vs tests).
+        db = Path(cfg.memory.sqlite_path)
+        db = db if db.is_absolute() else REPO_ROOT / db
+        store = MemoryStore(str(db))
         self.conversation = ConversationMemory(store)
         self.episodic = EpisodicMemory(store)
-        self.records = Records(str(Path(cfg.memory.sqlite_path).parent / "records.db"))
+        self.records = Records(str(db.parent / "records.db"))
         self.results = ResultWaiter(self.bus)
         self.gateway = Gateway()
         self.agent = BrainAgent(build_vlm(cfg), self.registry, self.conversation,

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentBot · 系統架構與模組分工</title>
+<style>
+  :root{--bg:#eef2f9;--card:#fff;--ink:#1f2937;--muted:#64748b;--line:#e2e8f0;
+    --teal:#0ea5e9;--teal2:#0284c7;--indigo:#6366f1;--violet:#8b5cf6;--green:#10b981;--amber:#f59e0b;--rose:#f43f5e;
+    --shadow:0 10px 30px rgba(15,23,42,.08),0 2px 6px rgba(15,23,42,.05);}
+  @media (prefers-color-scheme: dark){:root{--bg:#0b1120;--card:#111a2e;--ink:#e5edf7;--muted:#94a3b8;--line:#1e293b;
+    --shadow:0 10px 30px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.35);}}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,rgba(99,102,241,.14),transparent 60%),
+    radial-gradient(900px 500px at 0% 0%,rgba(14,165,233,.12),transparent 55%),var(--bg);
+    color:var(--ink);font:16px/1.65 -apple-system,"Segoe UI",Roboto,"PingFang TC","Microsoft JhengHei",sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:48px 24px 80px}
+  .eyebrow{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal2);font-weight:700}
+  h1{font-size:clamp(28px,4vw,40px);line-height:1.12;margin:8px 0 10px;letter-spacing:-.02em}
+  .lede{font-size:18px;color:var(--muted);max-width:880px;margin:0}
+  .toc{display:flex;flex-wrap:wrap;gap:8px 16px;margin:18px 0 0;font-size:14px}
+  .toc a{color:var(--teal2);text-decoration:none}.toc a:hover{text-decoration:underline}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:26px 28px;margin:24px 0}
+  .diagram{padding:20px;background:#eef2f7;border-color:#d6deea;overflow:hidden}
+  @media (prefers-color-scheme: dark){.diagram{background:#0c1422;border-color:#1b2740}}
+  .cap{color:var(--muted);font-size:13px;margin:2px 2px 12px}
+  h2{font-size:23px;margin:6px 0 6px;display:flex;align-items:center;gap:10px}
+  h2 .dot{width:12px;height:12px;border-radius:50%}
+  h3{font-size:16px;margin:18px 0 4px}
+  code{font:13.5px ui-monospace,Menlo,Consolas,monospace;background:rgba(99,102,241,.10);padding:2px 6px;border-radius:6px}
+  pre{background:rgba(99,102,241,.06);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto;
+    font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;color:var(--ink)}
+  img.shot{width:100%;height:auto;border-radius:12px;display:block;background:#eef2f7}
+  table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:13px}
+  td code{font-size:12.5px}
+  .pill{display:inline-block;font:600 12px ui-monospace,monospace;padding:2px 9px;border-radius:999px;background:rgba(14,165,233,.14);color:var(--teal2)}
+  .note{border-left:4px solid var(--amber);background:rgba(245,158,11,.08);border-radius:0 12px 12px 0;padding:12px 16px;margin:16px 0;font-size:14.5px}
+  .note.ok{border-left-color:var(--green);background:rgba(16,185,129,.08)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:16px}
+  .tile{border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .tile .k{font:600 13px ui-monospace,monospace;color:var(--teal2)}
+  .tile h4{margin:4px 0 6px;font-size:15px}.tile p{margin:0;font-size:13.5px;color:var(--muted)}
+  footer{color:var(--muted);font-size:13px;text-align:center;margin-top:36px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">IsaacLab-GR00T · AgentBot · Phase 2</div>
+    <h1>AgentBot — 系統架構與模組分工</h1>
+    <p class="lede">AgentBot 是<strong>管控整個 agentic 機器人系統運行</strong>的編排層：一句自然語言命令，經 LLM/VLM
+    <strong>大腦</strong>推理規劃、拆解成有序的<strong>技能</strong>，每個技能驅動 <strong>GR00T VLA</strong> 在 IsaacLab
+    執行（未來可上實機）；一個 <strong>Monitor／事件匯流排</strong>觀測全層、收斂回饋與即時安全。它同時掌管
+    <strong>UI 儀表板、Monitor、命令佇列、History／統計</strong>。本報告的流程圖皆為動畫：虛線沿箭頭方向流動＝資料流。</p>
+    <div class="toc">
+      <a href="#map">① 系統地圖</a><a href="#orch">② 命令編排生命週期</a><a href="#topo">③ 執行期拓樸</a>
+      <a href="#modules">④ 模組分工</a><a href="#dash">⑤ 儀表板</a><a href="#run">⑥ 如何運行</a><a href="#history">⑦ History／任務管理</a>
+    </div>
+  </header>
+
+  <!-- ① system map -->
+  <section class="card diagram" id="map">
+    <div class="cap">① 系統地圖 — 七個區塊與資料流（1·2·4·5 + 3 已實作；6·7 實機為未來）。<a href="agentbot_system_map.svg" target="_blank">↗ 獨立大圖</a></div>
+    <img class="shot" src="agentbot_system_map.svg" alt="AgentBot 系統地圖">
+  </section>
+  <section class="card">
+    <h2><span class="dot" style="background:var(--indigo)"></span>AgentBot 管控的範圍</h2>
+    <p>是的 —— AgentBot 是整個系統的「控制器」。VLA 執行（區塊 5）沿用既有的 <code>scripts/eval/*</code> + GR00T 伺服器；
+    AgentBot 把它<strong>之上的所有東西</strong>包起來並編排：</p>
+    <div class="grid">
+      <div class="tile"><div class="k">1 · User Input</div><h4>UI / 儀表板</h4><p>輸入命令、即時狀態、控制（停止/清除/E-stop）。</p></div>
+      <div class="tile"><div class="k">2 · Brain</div><h4>VLM 大腦</h4><p>理解、推理、規劃，把命令拆成有序 atomic skills。</p></div>
+      <div class="tile"><div class="k">3 · Monitor</div><h4>事件匯流排 + 安全</h4><p>即時狀態、回饋迴路、即時安全停止、把關技能完成。</p></div>
+      <div class="tile"><div class="k">4 · Skill Layer</div><h4>語意動作工具</h4><p>可重用、含參數/約束的 atomic skill。</p></div>
+      <div class="tile"><div class="k">5 · VLA Engine</div><h4>GR00T + IsaacLab</h4><p>常駐模擬執行；未來換 backend 即上實機。</p></div>
+      <div class="tile"><div class="k">Records</div><h4>History / 統計</h4><p>命令、技能執行、成功率 —— 任務管理系統。</p></div>
+    </div>
+  </section>
+
+  <!-- ② orchestration -->
+  <section class="card diagram" id="orch">
+    <div class="cap">② 命令編排生命週期（Phase 2 的核心）— 命令 → 拆解 → 常駐 IsaacLab 逐一執行（Monitor 把關、失敗重試/重規劃）→ 紀錄 → done。<a href="agentbot_orchestration.svg" target="_blank">↗ 獨立大圖</a></div>
+    <img class="shot" src="agentbot_orchestration.svg" alt="命令編排生命週期">
+  </section>
+  <section class="card">
+    <h2><span class="dot" style="background:var(--violet)"></span>長任務怎麼跑（編排核心）</h2>
+    <table>
+      <tr><th>#</th><th>步驟</th><th>由誰</th></tr>
+      <tr><td>1</td><td>UI 送命令 → 入<b>命令佇列</b>（FIFO，輸入框立即清空、可非同步再下、可清除）</td><td><code>POST /v1/commands</code></td></tr>
+      <tr><td>2</td><td>大腦取最舊命令 → VLM <b>拆解</b>成有序 <code>SkillPlan</code>（多個 atomic skill）</td><td><code>brain/orchestrator.py</code> + <code>agent.plan()</code></td></tr>
+      <tr><td>3</td><td>逐一派 skill → <code>vla:tasks</code> 佇列；<b>等</b>結果（Monitor 把關）才推進下一個</td><td>orchestrator + <code>ResultWaiter</code></td></tr>
+      <tr><td>4</td><td>常駐 <code>sim_session</code>（IsaacLab 全程開著）取出 skill，跑一集到 <code>task_done()</code></td><td><code>vla/sim_session.py</code></td></tr>
+      <tr><td>5</td><td>成功 → 下一個 skill；失敗 → <b>重試 N 次</b> → 仍失敗則大腦<b>重規劃或中止</b></td><td>orchestrator <code>_run_skill_with_retry</code> / <code>_replan</code></td></tr>
+      <tr><td>6</td><td>全程<b>紀錄</b>（命令/技能/結果/統計）；全部 skill 完成 → 命令 <code>done</code> → 回 idle/等待</td><td><code>records/store.py</code></td></tr>
+    </table>
+    <p class="note">即時安全：任何 <code>safety</code> 事件且 <code>immediate=true</code> 會同步觸發 <code>SafetyWatchdog</code>（模擬：中止任務；實機：ROS2 e-stop）。</p>
+  </section>
+
+  <!-- ③ topology -->
+  <section class="card diagram" id="topo">
+    <div class="cap">③ 執行期拓樸 — 三個程序，Redis 是接縫。<code>backbone: in-proc</code> 則全部縮成一個程序（免 GPU demo）。<a href="agentbot_runtime_topology.svg" target="_blank">↗ 獨立大圖</a></div>
+    <img class="shot" src="agentbot_runtime_topology.svg" alt="執行期拓樸">
+  </section>
+
+  <!-- ④ modules -->
+  <section class="card" id="modules">
+    <h2><span class="dot" style="background:var(--teal)"></span>④ 程式碼結構與模組分工</h2>
+    <pre>agentbot/agentbot/
+  contracts/    ← 協定。跨所有分層的 Pydantic 模型。<b>先讀這個。</b>
+                  common · messages · skills · vla · events · commands
+  brain/        ← 區塊 2「思考」層
+                  gateway · agent · <b>orchestrator</b> · vlm_client · memory/
+  skills/       ← 區塊 4。語意動作工具（sort_can, pour_water）+ registry
+  vla/          ← 區塊 5。GR00T + IsaacLab 執行
+                  <b>sim_session</b>(常駐,Phase 2) · isaac_runner(單次,Phase 1) · policy_server · worker · backends/
+  monitor/      ← 區塊 3。event_bus · state_store · job_queue · command_queue · results · safety · success_judge · ingest
+  records/      ← SQLite 任務管理（commands, skill_runs, stats）
+  api/          ← FastAPI：app · deps(組裝根) · routes_{chat,commands,skills,vla,events}
+  ui/console.html ← 階層式儀表板（vanilla，掛在 /）</pre>
+    <table>
+      <tr><th>模組</th><th>區塊</th><th>職責</th></tr>
+      <tr><td><code>contracts/</code></td><td>—</td><td><b>協定</b>：UserMessage·SkillPlan·SkillCall·VlaTaskRequest·VlaTaskResult·Event·Command。跨層、序列化成 JSON。</td></tr>
+      <tr><td><code>brain/orchestrator.py</code></td><td>2</td><td>命令迴圈：拆解 → 逐一派 skill → 等結果 → 重試/重規劃 → 紀錄。</td></tr>
+      <tr><td><code>brain/vlm_client.py</code></td><td>2</td><td>可插拔 VLM（預設 Qwen3-VL；可換 <code>gr00t-vlm</code>/claude/openai）。</td></tr>
+      <tr><td><code>skills/</code></td><td>4</td><td>每個 skill 宣告參數/約束（亦可輸出成 LLM tool schema）、驗證、轉成 <code>VlaTaskRequest</code>。</td></tr>
+      <tr><td><code>vla/sim_session.py</code></td><td>5</td><td>常駐 IsaacLab：開一次、逐一吃 <code>vla:tasks</code> 的 skill、跑到 <code>task_done</code>、發布結果。</td></tr>
+      <tr><td><code>monitor/</code></td><td>3</td><td>事件匯流排（Redis Streams / in-proc）、即時狀態、命令/工作佇列、ResultWaiter、安全、success_judge。</td></tr>
+      <tr><td><code>records/store.py</code></td><td>—</td><td>命令/技能執行/統計的 SQLite 紀錄（History + 任務管理）。</td></tr>
+      <tr><td><code>api/</code> + <code>ui/</code></td><td>—</td><td>FastAPI 端點 + 階層式儀表板，串起 1·2·4·5 並對外。</td></tr>
+    </table>
+    <p class="note ok"><b>新手導讀順序：</b> <code>contracts/</code>（詞彙）→ <code>brain/orchestrator.py</code>（命令迴圈）→
+    <code>vla/sim_session.py</code>（skill 怎麼變成真的一集）→ <code>api/deps.py</code>（怎麼組裝）→ <code>ui/console.html</code>。</p>
+  </section>
+
+  <!-- ⑤ dashboard -->
+  <section class="card" id="dash">
+    <h2><span class="dot" style="background:var(--green)"></span>⑤ 儀表板（UI）</h2>
+    <p>掛在 <code>/</code> 的 vanilla 階層式儀表板（無建置鏈，FastAPI 直接服務）：</p>
+    <div class="grid">
+      <div class="tile"><div class="k">控制列</div><h4>Stop · Clear · E-STOP · checkpoint</h4><p>選 checkpoint、停止編排、清空佇列、緊急停止。</p></div>
+      <div class="tile"><div class="k">Navigator</div><h4>可展開 sidebar</h4><p>System / Monitor / Commands(可下鑽) / Skills / Stats / Memory。</p></div>
+      <div class="tile"><div class="k">Commands</div><h4>佇列 + 下鑽</h4><p>命令 → 計畫 → 技能執行時間軸（成功/重試/步數）。</p></div>
+      <div class="tile"><div class="k">Monitor</div><h4>即時</h4><p>即時狀態、事件串流、VLA 遙測圖（WS <code>/v1/events</code>）。</p></div>
+      <div class="tile"><div class="k">Stats</div><h4>任務管理</h4><p>每技能成功率長條圖、命令計數。</p></div>
+      <div class="tile"><div class="k">New command</div><h4>送出即清空</h4><p>非同步排入後端，可連續再下一個。</p></div>
+    </div>
+  </section>
+
+  <!-- ⑥ run -->
+  <section class="card" id="run">
+    <h2><span class="dot" style="background:var(--teal2)"></span>⑥ 如何運行</h2>
+    <p>所有設定都在 <code>config/agentbot.yaml</code>（每個參數在檔內有註解）。兩種模式：</p>
+<pre># A) 免 GPU demo（一個程序、假 VLA）— 設 backbone: in-proc，開 http://localhost:8780
+uv sync && uv run uvicorn agentbot.api.app:app --port 8780
+
+# B) 真實流程（GPU、4 個程序）— 設 backbone: redis
+redis-server                                                       # 1 匯流排
+uv run uvicorn agentbot.api.app:app --port 8780                    # 2 Core + 儀表板 + 編排器
+cd Isaac-GR00T_n1d7 && source .venv/bin/activate && python -m gr00t.eval.run_gr00t_server \
+   --model-path &lt;ckpt&gt; --embodiment-tag new_embodiment --port 5555  # 3 GR00T server
+conda activate env_isaaclab && pip install -e agentbot && cd IsaacLab \
+   && python -m agentbot.vla.sim_session --headless                 # 4 常駐 IsaacLab（全程開著）</pre>
+  </section>
+
+  <!-- ⑦ history -->
+  <section class="card" id="history">
+    <h2><span class="dot" style="background:var(--amber)"></span>⑦ History / 任務管理</h2>
+    <p>每個命令、每次技能執行、每個成敗都落地 SQLite（<code>records/</code>），所以系統像一個<strong>任務／工作管理系統</strong>：</p>
+    <ul>
+      <li><b>命令歷史</b>：狀態（queued/running/done/failed）、計畫、結果摘要、時間。</li>
+      <li><b>技能執行</b>：每個 skill 的 task_id、嘗試次數、成敗、步數、時長 —— 下鑽可看時間軸。</li>
+      <li><b>統計</b>：每技能成功率、平均時長、命令計數（<code>GET /v1/stats</code>）。</li>
+    </ul>
+    <p class="note">Monitor（即時，Redis）與 Records（持久，SQLite）刻意分開：前者輕量即時（安全路徑走它），後者是認知/歷史。儀表板讀兩邊。</p>
+  </section>
+
+  <footer>IsaacLab-GR00T · AgentBot Phase 2 · 流程圖為動畫 SVG（虛線沿箭頭流動＝資料流）· 設定見 <code>config/agentbot.yaml</code> · 進度見 <code>TASKS.md</code></footer>
+</div>
+</body>
+</html>

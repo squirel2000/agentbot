@@ -1,42 +1,59 @@
-# AgentBot configuration. Copy to `config/agentbot.yaml` (gitignored) and edit.
-# Everything machine-specific or swappable lives here — never hardcoded in code.
+# ─────────────────────────────────────────────────────────────────────────────
+#  AgentBot configuration — THE single place for every setting.
+#  Copy this file to  config/agentbot.yaml  (gitignored) and edit it.
+#  Every option is documented here; you should not need to look anywhere else.
+# ─────────────────────────────────────────────────────────────────────────────
 
+# How the processes talk to each other.
+#   in-proc : everything in ONE process; a fake VLA runs commands. No Redis, no GPU.
+#             Best for the dashboard demo and development.
+#   redis   : Core/API, the persistent sim_session, and the GR00T server are SEPARATE
+#             processes that coordinate via Redis. This is the real flow (needs a GPU).
+backbone: in-proc
+
+# Block 2 — the Brain's vision-language model (it can see the camera + reason).
 vlm:
-  backend: qwen-vl            # qwen-vl | claude | openai
-  model: Qwen3-VL-8B
-  base_url: http://localhost:8000/v1   # OpenAI-compatible endpoint for the local Qwen3-VL server
+  backend: qwen-vl            # qwen-vl | gr00t-vlm | claude | openai
+                              #   qwen-vl  : open-source Qwen3-VL (default placeholder)
+                              #   gr00t-vlm: the VLM extracted+fine-tuned from GR00T N1.7 (when ready)
+  model: Qwen3-VL-8B          # model name (informational / passed to the backend)
+  base_url: http://localhost:8000/v1   # OpenAI-compatible endpoint serving the model
   api_key_env: ""             # name of the env var holding the API key (claude/openai); "" = none
 
+# Cross-process bus + queues (only used when backbone: redis).
 redis:
   url: redis://localhost:6379/0
-  events_stream: agentbot:events
-  tasks_queue: agentbot:vla:tasks
-  state_hash: agentbot:state
+  events_stream: agentbot:events     # Monitor event stream (telemetry, state, safety…)
+  tasks_queue:   agentbot:vla:tasks   # skill → VLA job queue (orchestrator LPUSH, sim_session RPOP)
+  state_hash:    agentbot:state       # live state snapshot
+  # Note: the command queue uses key  agentbot:commands  (UI → orchestrator, FIFO).
 
+# Block 2 memory + the task-management records (always SQLite; relative paths resolve
+# under the repo root, so they're cwd-independent).
 memory:
-  sqlite_path: agentbot/var/agentbot.db
+  sqlite_path: agentbot/var/agentbot.db   # conversation + episodic memory; records.db is a sibling
   vector:
-    backend: chroma           # chroma | none
+    backend: chroma           # chroma | none  (long-term semantic RAG; optional, Phase 2c)
     path: agentbot/var/chroma
 
+# Block 5 — the VLA execution engine (GR00T running in IsaacLab).
 vla:
-  embodiment: sim             # sim | hardware
-  gr00t_ver: N1.7
-  isaaclab_repo: IsaacLab
+  embodiment: sim             # sim | hardware (hardware = future, via openarm_ros2)
+  gr00t_ver: N1.7             # selects the eval backend config + client wire format
+  isaaclab_repo: IsaacLab     # path (relative to repo root) to the IsaacLab checkout
   isaaclab_conda_env: env_isaaclab
-  default_task: Isaac-Can-Sorting-OpenArm-DexHand-v0
-  options: { headless: true, save_video: true, filter: true }
-  # Swappable checkpoint registry — the path is NEVER hardcoded in code.
-  # Change `default_checkpoint`, add entries here, or override per request by name.
+  default_task: Isaac-Can-Sorting-OpenArm-DexHand-v0   # the gym task the sim_session loads
+  options: { headless: true, save_video: true, filter: true }   # per-episode run options
+
+  # ── Swappable checkpoint registry — the model path is NEVER hardcoded in code. ──
+  # Change `default_checkpoint`, add entries here, or override per request (a skill
+  # invoke / VLA task can pass a `checkpoint` = a name below OR a literal path).
   default_checkpoint: n17_150k_lr1e4_absolute
   checkpoints:
     n17_150k_lr1e4_absolute: artifacts/checkpoints/gr00t/N1_7_fft_0615_150k_lr1e4_absolute_no_tune_visual
     n17_150k_lr5e5:          artifacts/checkpoints/gr00t/N1_7_fft_0614_150k_lr5e5_no_tune_visual
 
+# The API + dashboard server.
 api:
   host: 0.0.0.0
   port: 8780
-
-# in-proc | redis — selects EventBus/StateStore/JobQueue impls.
-# "in-proc" runs the whole core in one process (no Redis needed) for local dev/tests.
-backbone: in-proc
