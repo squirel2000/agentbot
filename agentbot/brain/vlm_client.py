@@ -38,7 +38,13 @@ class VLMClient(abc.ABC):
     # before a real model is connected. Replaced by real tool-calls in MVP.
     @staticmethod
     def _stub_reply(messages: list[dict[str, Any]], tools: list[dict]) -> VLMReply:
-        last = (messages[-1]["content"] if messages else "").lower()
+        raw = messages[-1]["content"] if messages else ""
+        # content may be a str (plain text) or a list of parts (multimodal OpenAI format).
+        # Extract the plain-text portion for the keyword-matching stub.
+        if isinstance(raw, list):
+            text_parts = [p["text"] for p in raw if isinstance(p, dict) and p.get("type") == "text"]
+            raw = " ".join(text_parts)
+        last = raw.lower()
         for t in tools:
             tokens = [tok for tok in t["name"].split("_") if tok]
             if tokens and all(tok in last for tok in tokens):
@@ -85,7 +91,37 @@ class Gr00tVLMClient(VLMClient):
     """
 
     async def complete(self, messages: list[dict[str, Any]], tools: list[dict]) -> VLMReply:
-        return self._stub_reply(messages, tools)
+        import json
+        import httpx
+        from agentbot.contracts.skills import SkillCall
+
+        payload = {
+            "model": self.model or "gr00t-vlm",
+            "messages": messages,
+            "tools": [{"type": "function",
+                       "function": {"name": t["name"], "description": t.get("description", ""),
+                                    "parameters": t["input_schema"]}} for t in tools],
+            "tool_choice": "auto",
+            "temperature": 0.0,
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                r = await client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+                r.raise_for_status()
+                data = r.json()
+        except Exception:  # endpoint down/misconfigured -> safe stub so the loop survives
+            return self._stub_reply(messages, tools)
+        msg = (data.get("choices") or [{}])[0].get("message", {})
+        calls = []
+        for tc in msg.get("tool_calls", []) or []:
+            fn = tc.get("function", {})
+            try:
+                args = json.loads(fn.get("arguments", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                args = {}
+            calls.append(SkillCall(name=fn.get("name", ""), args=args, rationale=msg.get("content") or ""))
+        return VLMReply(text=msg.get("content") or "", calls=calls)
 
 
 def build_vlm(cfg) -> VLMClient:

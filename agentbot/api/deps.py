@@ -72,8 +72,16 @@ class Deps:
         self.records = Records(str(db.parent / "records.db"))
         self.results = ResultWaiter(self.bus)
         self.gateway = Gateway()
+        def _latest_frame() -> Optional[str]:
+            try:
+                snap = self.state.snapshot()
+            except Exception:
+                return None
+            return (snap.get("camera") or {}).get("frame")
+
         self.agent = BrainAgent(build_vlm(cfg), self.registry, self.conversation,
-                                bus=self.bus, gateway=self.gateway)
+                                bus=self.bus, gateway=self.gateway,
+                                frame_provider=_latest_frame)
         self.ingestor = Ingestor(self.bus, self.state, self.episodic)
         self.watchdog = SafetyWatchdog(self.bus, on_stop=self._on_safety_stop)
         self.orchestrator = Orchestrator(

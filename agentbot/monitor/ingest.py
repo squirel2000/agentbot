@@ -25,6 +25,8 @@ class Ingestor:
         """Process one event (sync, unit-testable)."""
         if ev.type in _LIVE_STATE_TYPES:
             self.state.set_state(ev.type.value, ev.payload)
+        if ev.type == EventType.CAMERA:
+            self.state.set_state("camera", ev.payload)
         if ev.type == EventType.VLA_TELEMETRY and ev.task_id:
             key = f"vla:{ev.task_id}"
             merged = {**self.state.get_state(key), **ev.payload}

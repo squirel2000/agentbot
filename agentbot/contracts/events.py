@@ -23,6 +23,7 @@ class EventType(str, Enum):
     SKILL_LIFECYCLE = "skill_lifecycle"
     AGENT_LIFECYCLE = "agent_lifecycle"
     USER_IO = "user_io"
+    CAMERA = "camera"
 
 
 class Event(BaseModel):

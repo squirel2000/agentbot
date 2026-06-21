@@ -10,7 +10,7 @@ the API layer / MVP, marked below with ``# MVP:``.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Callable, Optional
 
 from agentbot.brain.gateway import Gateway
 from agentbot.brain.vlm_client import VLMClient
@@ -22,35 +22,51 @@ from agentbot.monitor.event_bus import EventBus
 from agentbot.skills.registry import SkillRegistry
 
 
+def build_user_content(text: str, image: Optional[str]):
+    """OpenAI message content: plain text, or [text, image_url] when an image is available.
+
+    `image` is a path or data-uri (UserMessage.image_path) or a live frame from frame_provider.
+    """
+    if not image:
+        return text
+    return [{"type": "text", "text": text}, {"type": "image_url", "image_url": {"url": image}}]
+
+
 class BrainAgent:
     def __init__(self, llm: VLMClient, registry: SkillRegistry,
                  conversation: ConversationMemory, bus: Optional[EventBus] = None,
-                 gateway: Optional[Gateway] = None) -> None:
+                 gateway: Optional[Gateway] = None,
+                 frame_provider: Optional[Callable[[], Optional[str]]] = None) -> None:
         self.llm = llm
         self.registry = registry
         self.conversation = conversation
         self.bus = bus
         self.gateway = gateway or Gateway()
+        self.frame_provider = frame_provider
 
     async def _emit(self, session_id: str, payload: dict) -> None:
         if self.bus is not None:
             await self.bus.publish(Event(type=EventType.AGENT_LIFECYCLE, source="brain.agent",
                                          session_id=session_id, payload=payload))
 
-    async def _complete(self, text: str, session_id: str) -> tuple[SkillPlan, str]:
+    async def _complete(self, text: str, session_id: str,
+                         image: Optional[str] = None) -> tuple[SkillPlan, str]:
         """Run the LLM decomposition for *text* against the current conversation history.
 
         Builds the message list from the N most-recent prior turns in *session_id*,
         then appends *text* as the current user message.  Returns ``(plan, reply_text)``
         so both ``plan()`` and ``handle()`` can use the result without duplicating logic
         or re-calling the LLM.
+
+        When *image* is provided (data-uri or path), the user message is built as a
+        multimodal OpenAI content list so the VLM can see the camera frame.
         """
         history = self.conversation.recent(session_id, n=10)
         messages = [{"role": "user" if t["role"] == "user" else "assistant", "content": t["text"]}
                     for t in history]
         # Always append the current user message so the LLM sees it regardless of
         # whether the caller has already persisted it.
-        messages.append({"role": "user", "content": text})
+        messages.append({"role": "user", "content": build_user_content(text, image)})
         tools = self.registry.as_tool_schemas()
 
         reply = await self.llm.complete(messages, tools)
@@ -64,13 +80,14 @@ class BrainAgent:
         add any turns or emit events. Intended for the Phase-2 orchestrator to
         preview or execute the plan step by step.
         """
-        plan, _ = await self._complete(text, session_id)
+        image = self.frame_provider() if self.frame_provider else None
+        plan, _ = await self._complete(text, session_id, image=image)
         return plan
 
     async def handle(self, msg: UserMessage) -> AgentResponse:
         await self._emit(msg.session_id, {"state": AgentState.THINKING.value, "turn_id": msg.turn_id})
 
-        plan, reply_text = await self._complete(msg.text, msg.session_id)
+        plan, reply_text = await self._complete(msg.text, msg.session_id, image=msg.image_path)
         await self._emit(msg.session_id, {"state": AgentState.PLANNING.value,
                                           "turn_id": msg.turn_id, "n_calls": len(plan.calls)})
 

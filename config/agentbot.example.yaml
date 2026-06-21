@@ -19,6 +19,9 @@ vlm:
   model: Qwen3-VL-8B          # model name (informational / passed to the backend)
   base_url: http://localhost:8000/v1   # OpenAI-compatible endpoint serving the model
   api_key_env: ""             # name of the env var holding the API key (claude/openai); "" = none
+  # To use the fine-tuned GR00T VLM as the Brain, run the server (in Isaac-GR00T-VLM:
+  #   VLM_MODEL_DIR=<merged_vlm> uv run uvicorn vlm_lora.serve.openai_app:app --port 8000)
+  # then set:  backend: gr00t-vlm   model: gr00t-vlm   base_url: http://<vlm-host>:8000/v1
 
 # Cross-process bus + queues (only used when backbone: redis).
 redis:
