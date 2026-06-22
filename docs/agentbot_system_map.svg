@@ -103,11 +103,11 @@
 
   <!-- ===== monitor flows ===== -->
   <!-- VLA -> Monitor (state/telemetry) -->
-  <path class="flow evt" d="M320,560 H294 Q286,560 286,568 V612 Q286,620 278,620 H256" marker-end="url(#g)"/>
-  <text class="s labhalo" x="264" y="600" fill="#059669" font-size="10.8">狀態 / 遙測</text>
+  <path class="flow evt" d="M320,560 H256" marker-end="url(#g)"/>
+  <text class="s labhalo" x="264" y="552" fill="#059669" font-size="10.8">狀態 / 遙測</text>
   <!-- Monitor -> Brain (feedback up) -->
-  <path class="flow evt" d="M256,426 H278 Q286,426 286,418 V294 Q286,286 294,286 H320" marker-end="url(#g)"/>
-  <text class="s labhalo" x="264" y="410" fill="#059669" font-size="10.8">迴授</text>
+  <path class="flow evt" d="M148,374 V286 H320" marker-end="url(#g)"/>
+  <text class="s labhalo" x="160" y="350" fill="#059669" font-size="10.8">迴授</text>
   <!-- Safety: Monitor -> Robot Control (immediate stop) -->
   <path class="safe" d="M150,658 V697 Q150,705 158,705 H320" marker-end="url(#r)"/>
   <text class="s labhalo" x="160" y="690" fill="#be123c" font-size="10.8">立即安全停止</text>

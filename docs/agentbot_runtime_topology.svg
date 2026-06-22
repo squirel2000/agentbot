@@ -112,22 +112,22 @@
   <path class="flow ctl" d="M215,332 V344" marker-end="url(#mc)"/>
   <text class="lab" x="224" y="342" fill="#475569">SkillPlan</text>
   <!-- Monitor -> Console -->
-  <path class="flow ev" d="M300,458 V470" marker-end="url(#me)"/>
+  <path class="flow ev" d="M215,458 V470" marker-end="url(#me)"/>
 
   <!-- TASK rail (violet, y≈363) : Skills -> Redis:List -> Worker -->
   <path class="flow ex" d="M356,366 H450" marker-end="url(#mx)"/>
   <text class="lab" x="360" y="356" fill="#7c3aed">LPUSH VlaTaskRequest</text>
-  <path class="flow ex" d="M600,362 H618 Q626,362 626,366 H650" marker-end="url(#mx)"/>
+  <path class="flow ex" d="M600,362 H650" marker-end="url(#mx)"/>
   <text class="lab" x="606" y="354" fill="#7c3aed">BRPOP → run_rollout</text>
 
   <!-- EVENT rail (green, y≈414) : Worker -> Redis:Streams -> Monitor -->
-  <path class="flow ev" d="M650,416 H634 Q626,416 626,412 H600" marker-end="url(#me)"/>
+  <path class="flow ev" d="M650,416 H600" marker-end="url(#me)"/>
   <text class="lab" x="606" y="434" fill="#059669">XADD telemetry / result</text>
-  <path class="flow ev" d="M450,412 H422 Q414,412 414,420 V422 Q414,430 406,430 H356" marker-end="url(#me)"/>
+  <path class="flow ev" d="M450,412 H356" marker-end="url(#me)"/>
   <text class="lab" x="396" y="404" fill="#059669">XREAD</text>
 
   <!-- feedback (green) on the left gutter, avoids Skills -->
-  <path class="flow ev" d="M74,432 H64 Q56,432 56,424 V296 Q56,288 64,288 H74" marker-end="url(#me)"/>
+  <path class="flow ev" d="M74,432 H56 V288 H74" marker-end="url(#me)"/>
   <text class="s" x="30" y="364" fill="#059669" transform="rotate(-90 30,364)">feedback 迴授</text>
 
   <!-- Worker -> GR00T -->
