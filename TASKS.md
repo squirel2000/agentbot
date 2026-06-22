@@ -2,7 +2,7 @@
 
 > 這份檔案記錄整個 AgentBot 的**規劃、目前進度、剩餘任務**。每完成一項就更新勾選 `[ ]→[x]`。
 > 完整設計見 [`docs/agentbot_architecture.html`](../docs/agentbot_architecture.html)；總體計畫見 `~/.claude/plans/architecture-png-robot-cozy-anchor.md`。
-> **最後更新：2026-06-18**
+> **最後更新：2026-06-21**
 
 ---
 
@@ -89,6 +89,8 @@
 
 **剩餘 Phase 1 收尾（較低風險）**
 - [ ] `brain/llm_client.py`：把 stub 換成**真的** Qwen3-VL tool-calling（需先有 Qwen OpenAI 相容 server 才能測）
+  - ✅ `gr00t-vlm` 後端已實作：`Gr00tVLMClient.complete()` POST 到 `/v1/chat/completions`，解析 `tool_calls` → `SkillCall`；伺服器由 `Isaac-GR00T-VLM/src/vlm_lora/serve/openai_app.py` 提供（`bash examples/run_vlm_server.sh`，設 `vlm.backend: gr00t-vlm` + `base_url`）。
+  - ✅ 相機影像→Brain 視覺管道已就緒：`CAMERA` 事件 → `Monitor.ingest()` → `state["camera"]` → `Brain.step()` 組成含 `image_url` content part 的多模態訊息，隨每次 VLM 請求送出。
 - [ ] `brain/agent.py`：plan 產生後**自動派工**到 VLA（目前是 Console 按「▶ 執行」或 `POST /v1/skills/{name}/invoke` 顯式派工）
 - [ ] 多集成功率：跑 N 集得統計（單集無法代表成功率；可挑表現較好的 checkpoint，如 `n17_150k_lr1e4_absolute`）
 
@@ -121,3 +123,4 @@
 
 - 2026-06-17 Phase 0 完成（骨架 + 報告，23 測試）。
 - 2026-06-18 Phase 0.5 完成（動畫圖重繪、系統地圖重生、改用 uv、TASKS 檔、README）。
+- 2026-06-21 Phase F 文件：記錄 `gr00t-vlm` 後端已實作 + 相機→Brain 視覺管道已就緒（Phase 1 收尾子項）。
