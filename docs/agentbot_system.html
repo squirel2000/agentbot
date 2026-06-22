@@ -138,6 +138,10 @@
   <section class="card" id="dash">
     <h2><span class="dot" style="background:var(--green)"></span>⑤ 儀表板（UI）</h2>
     <p>掛在 <code>/</code> 的 vanilla 階層式儀表板（無建置鏈，FastAPI 直接服務）：</p>
+    <figure style="margin:0 0 14px">
+      <img class="shot" src="agentbot_dashboard.png" alt="AgentBot 階層式儀表板 — System 總覽" style="border:1px solid var(--line)">
+      <figcaption class="cap" style="margin-top:8px"><b>System 總覽</b>：頂部控制列（checkpoint 選擇 · Clear queue · Stop · E-STOP）、左側 Navigator（System / Monitor / Commands · Skills · Stats / Memory ＋ 送命令框）、主面板（命令／佇列／VLA-tasks 計數 ＋ pipeline）。圖中為 3 個命令、3 done · 0 failed 的即時狀態；其餘視圖如下。</figcaption>
+    </figure>
     <div class="grid">
       <div class="tile"><div class="k">控制列</div><h4>Stop · Clear · E-STOP · checkpoint</h4><p>選 checkpoint、停止編排、清空佇列、緊急停止。</p></div>
       <div class="tile"><div class="k">Navigator</div><h4>可展開 sidebar</h4><p>System / Monitor / Commands(可下鑽) / Skills / Stats / Memory。</p></div>
