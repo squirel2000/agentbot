@@ -52,9 +52,10 @@ import torch
 from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab_tasks.utils import parse_env_cfg
 
-from agentbot.contracts.events import Event
+from agentbot.contracts.events import Event, EventType
 from agentbot.contracts.vla import VlaTaskRequest, VlaTaskResult, VlaTaskStatus, VlaTelemetry
 from agentbot.settings import REPO_ROOT, load_config
+from agentbot.vla.frame_encode import frame_to_datauri
 from agentbot.vla.isaac_runner import _telemetry_event, backend_spec
 from agentbot.vla.worker import _result_event, _status_event
 
@@ -99,6 +100,36 @@ def run_stabilization(env, idle_actions):
     return obs
 
 
+def _scene_target_color(obs):
+    """The env's current randomized target plate color ('orange'|'green'), or None.
+
+    Single source of truth for both the instruction sync (run_skill) and the Monitor
+    state the Brain reads to resolve a bare 'sort can'. {0: orange, 1: green} mirrors
+    gr00t_infer_agent.py's TARGET_COLOR_ID_TO_NAME."""
+    try:
+        cid = int(obs["scene_obs"]["target_object_color"].cpu().numpy().reshape(-1)[0])
+        return {0: "orange", 1: "green"}.get(cid)
+    except (KeyError, TypeError, IndexError, AttributeError, ValueError):
+        return None
+
+
+def publish_scene(obs, publish, task_name: str) -> None:
+    """Publish a fresh head-camera frame + the env's target color to the Monitor.
+
+    Lets the dashboard show the live scene while idle, and lets the Brain turn a bare
+    'sort can' into 'place the can on the <color> plate' from state['environment']."""
+    try:
+        img = obs["robot_obs"][CAMERA_OBS["head"]].cpu().numpy().astype(np.uint8)
+        publish(Event(type=EventType.CAMERA, source="vla.sim_session",
+                      payload={"frame": frame_to_datauri(img)}))
+    except (KeyError, TypeError, AttributeError):
+        pass
+    color = _scene_target_color(obs)
+    if color:
+        publish(Event(type=EventType.ENVIRONMENT, source="vla.sim_session",
+                      payload={"target_color": color, "task": task_name}))
+
+
 def build_env(task_name: str):
     """Create env + JointMapper + idle action + task_done for *task_name* (keeps app alive)."""
     env_cfg = parse_env_cfg(task_name, device=args_cli.device, num_envs=1,
@@ -137,9 +168,30 @@ def run_skill(env, mapper, idle, task_done, client, req: VlaTaskRequest, publish
         obs = run_stabilization(env, idle)
         publish(_status_event(req, "running", task_name=req.task_name, instruction=req.instruction))
 
+        # The Can-Sorting env RANDOMIZES the target plate on every reset and judges success
+        # (task_done) against THAT randomized basket. So we must drive the policy with the
+        # env's actual target, not the Brain's commanded color — otherwise the policy chases
+        # the wrong plate, task_done is never True, and the orchestrator retries/replans
+        # forever (the "action repeats / always failed though it completed" symptom).
+        # This mirrors gr00t_infer_agent.py --multitask (TARGET_COLOR_ID_TO_NAME {0:orange,1:green}).
+        # NOTE: this means the *commanded* color is overridden by the env's random one; honoring
+        # the exact commanded color would require setting the env target on reset (a follow-up).
+        color = _scene_target_color(obs)
+        if color:
+            publish(Event(type=EventType.ENVIRONMENT, source="vla.sim_session",
+                          payload={"target_color": color, "task": req.task_name}))
+            synced = [f"place the can on the {color} plate"]
+            if synced != task_description:
+                print(f"[sim_session] env target={color}; syncing instruction "
+                      f"(commanded {task_description[0]!r})", flush=True)
+            task_description = synced
+
         while steps < args_cli.max_steps:
             joint_pos = obs["robot_obs"]["robot_joint_pos"].cpu().numpy().astype(np.float64)[0]
             cam_imgs = {c: obs["robot_obs"][k].cpu().numpy().astype(np.uint8) for c, k in zip(cameras, cam_keys)}
+            if "head" in cam_imgs:               # publish the live frame so the Brain can see it
+                publish(Event(type=EventType.CAMERA, source="vla.sim_session",
+                              payload={"frame": frame_to_datauri(cam_imgs["head"])}))
             gr00t_obs = {"annotation.human.task_description": task_description,
                          **mapper.map_isaac_obs_to_gr00t_state(joint_pos)}
             for c, img in cam_imgs.items():
@@ -231,6 +283,14 @@ def _serve(cfg) -> None:
     client = _make_client(cfg)
     current_task = args_cli.task or cfg.vla.default_task
     env, mapper, idle, task_done = build_env(current_task)
+
+    # Reset once at startup so the dashboard shows a fresh scene + target color immediately
+    # (and so the idle keepalive steps an initialized env, not an un-reset one).
+    with torch.inference_mode():
+        obs, _ = env.reset()
+        obs = run_stabilization(env, idle)
+    publish_scene(obs, publish, current_task)
+    last_scene_pub = time.time()
     print(f"[sim_session] ready; task={current_task}; polling {tasks_key}", flush=True)
 
     n = 0
@@ -240,15 +300,34 @@ def _serve(cfg) -> None:
         # the app stalls. So poll, and pump+sleep when the queue is empty.
         raw = r.rpop(tasks_key)
         if raw is None:
-            simulation_app.update()
-            time.sleep(0.02)
+            # Keep the kit app alive while idle (stepping idle actions, not just
+            # simulation_app.update()), and re-publish the live scene (frame + target color)
+            # ~1/s so the Brain always has a current view to resolve a bare "sort can".
+            with torch.inference_mode():
+                obs_idle, _, _, _, _ = env.step(idle)
+            now = time.time()
+            if now - last_scene_pub > 1.0:
+                publish_scene(obs_idle, publish, current_task)
+                last_scene_pub = now
+            time.sleep(0.01)
             continue
         req = VlaTaskRequest.model_validate_json(raw)
-        if req.task_name != current_task:
+        if req.task_name and req.task_name != current_task:
             env.close()
             current_task = req.task_name
             env, mapper, idle, task_done = build_env(current_task)
+        if req.params.get("control") == "reset":
+            # Control op (from POST /v1/control/reset): re-randomize the scene + re-publish;
+            # no policy episode is run.
+            print(f"[sim_session] reset scene (task={current_task})", flush=True)
+            with torch.inference_mode():
+                obs, _ = env.reset()
+                obs = run_stabilization(env, idle)
+            publish_scene(obs, publish, current_task)
+            last_scene_pub = time.time()
+            continue
         run_skill(env, mapper, idle, task_done, client, req, publish)
+        last_scene_pub = time.time()
         n += 1
         if args_cli.max_skills and n >= args_cli.max_skills:
             break

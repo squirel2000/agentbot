@@ -7,7 +7,8 @@ DELETE /v1/commands           — clear pending command queue
 
 GET    /v1/stats              — aggregate stats (commands / done / failed / per_skill)
 
-POST   /v1/control/stop       — graceful stop (orchestrator + clear queue)
+POST   /v1/control/stop       — recoverable stop (cancel current + drain queues + clear blocked)
+POST   /v1/control/reset      — reset the sim scene (re-randomize target plate) + publish frame
 POST   /v1/control/estop      — emergency stop (publish SAFETY/CRITICAL so watchdog trips)
 """
 from __future__ import annotations
@@ -19,6 +20,7 @@ from agentbot.api.deps import Deps, get_deps
 from agentbot.contracts.commands import Command
 from agentbot.contracts.events import Event, EventType, SafetyEvent
 from agentbot.contracts.common import Severity
+from agentbot.contracts.vla import VlaTaskRequest
 
 router = APIRouter()
 
@@ -62,9 +64,37 @@ async def stats(d: Deps = Depends(get_deps)) -> dict:
 
 @router.post("/v1/control/stop")
 async def control_stop(d: Deps = Depends(get_deps)) -> dict:
-    d.orchestrator.stop()
+    # RECOVERABLE soft-stop. Do NOT call orchestrator.stop() — that ends the run() loop
+    # permanently with no restart path (the "commands enqueue but nothing runs" bug). Instead:
+    #   1) cancel the in-flight command (stop retrying/replanning; the running episode finishes),
+    #   2) drain both queues — pending commands AND pending VLA tasks (`agentbot:vla:tasks`),
+    #   3) clear the safety-blocked robot_state so the system is usable again after an E-STOP.
+    d.orchestrator.cancel_current()
+    cleared_commands = d.command_queue.clear()
+    cleared_vla_tasks = d.queue.clear()
+    d.state.set_state("robot_state", {"mode": "idle", "detail": "stopped"})
+    return {"stopped": True, "cleared_commands": cleared_commands, "cleared_vla_tasks": cleared_vla_tasks}
+
+
+@router.post("/v1/control/reset")
+async def control_reset(d: Deps = Depends(get_deps)) -> dict:
+    # Reset the IsaacLab scene in the persistent sim_session: cancel + drain first, then enqueue a
+    # control task (params.control == "reset") on the same VLA queue. sim_session re-randomizes the
+    # target plate, stabilizes, and publishes a fresh head frame + the new target color to state —
+    # so the dashboard shows the live scene and a bare "sort can" resolves to the right plate.
+    d.orchestrator.cancel_current()
     d.command_queue.clear()
-    return {"stopped": True}
+    d.queue.clear()
+    ctx = d.vla_ctx(None)
+    req = VlaTaskRequest(
+        task_name=d.cfg.vla.default_task,
+        instruction="reset the scene",
+        checkpoint=ctx["checkpoint"],
+        params={"control": "reset"},
+    )
+    d.queue.put(req)
+    d.state.set_state("robot_state", {"mode": "idle", "detail": "reset"})
+    return {"reset": True, "task_id": req.task_id}
 
 
 @router.post("/v1/control/estop")

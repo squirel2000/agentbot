@@ -22,6 +22,15 @@ class JobQueue(abc.ABC):
         """Pop the next request, or ``None`` if none arrives within *timeout* seconds."""
         ...
 
+    @abc.abstractmethod
+    def clear(self) -> int:
+        """Drop every queued request; return how many were dropped.
+
+        Used by the dashboard ``Stop`` control to clear VLA tasks that were enqueued
+        but not yet consumed by the worker (so a stuck/runaway plan can be cancelled).
+        """
+        ...
+
 
 class InMemJobQueue(JobQueue):
     def __init__(self) -> None:
@@ -32,6 +41,11 @@ class InMemJobQueue(JobQueue):
 
     def get(self, timeout: float = 0.0) -> Optional[VlaTaskRequest]:
         return self._dq.popleft() if self._dq else None
+
+    def clear(self) -> int:
+        n = len(self._dq)
+        self._dq.clear()
+        return n
 
 
 class RedisJobQueue(JobQueue):
@@ -56,3 +70,11 @@ class RedisJobQueue(JobQueue):
             return None
         _key, raw = item
         return VlaTaskRequest.model_validate_json(raw)
+
+    def clear(self) -> int:
+        # LLEN then DEL: report how many pending VLA tasks were dropped. (A task already
+        # BRPOP'd by the worker is mid-episode and can't be cancelled here — that needs a
+        # cooperative abort inside sim_session, a separate follow-up.)
+        n = self._r.llen(self._key)
+        self._r.delete(self._key)
+        return int(n or 0)

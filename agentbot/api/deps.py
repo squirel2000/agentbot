@@ -79,9 +79,16 @@ class Deps:
                 return None
             return (snap.get("camera") or {}).get("frame")
 
+        def _scene_color() -> Optional[str]:
+            # The env's current target plate color, published by sim_session to state["environment"].
+            try:
+                return (self.state.get_state("environment") or {}).get("target_color")
+            except Exception:
+                return None
+
         self.agent = BrainAgent(build_vlm(cfg), self.registry, self.conversation,
                                 bus=self.bus, gateway=self.gateway,
-                                frame_provider=_latest_frame)
+                                frame_provider=_latest_frame, scene_provider=_scene_color)
         self.ingestor = Ingestor(self.bus, self.state, self.episodic)
         self.watchdog = SafetyWatchdog(self.bus, on_stop=self._on_safety_stop)
         self.orchestrator = Orchestrator(

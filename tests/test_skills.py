@@ -34,9 +34,14 @@ def test_sort_can_rejects_bad_enum():
     assert not ok and "target_color" in err
 
 
-def test_sort_can_rejects_missing_required():
-    ok, err = SortCanSkill().validate(SkillCall(name="sort_can", args={}))
-    assert not ok and "target_color" in err
+def test_sort_can_allows_missing_color_optional():
+    # target_color is now OPTIONAL: a bare "sort can" is valid. The Brain fills the color from
+    # the live scene (state['environment']); to_vla_request defaults to orange if still unset.
+    sk = SortCanSkill()
+    ok, err = sk.validate(SkillCall(name="sort_can", args={}))
+    assert ok, err
+    req = sk.to_vla_request(SkillCall(name="sort_can", args={}), CTX)
+    assert "orange" in req.instruction
 
 
 def test_pick_translates_object_into_instruction():

@@ -34,6 +34,7 @@ class PlaceSkill(Skill):
         preconditions=["object_grasped"],
         postconditions=["object_released", "arm_idle"],
         embodiments=[Embodiment.SIM],
+        sim_runnable=False,  # Isaac-Place-OpenArm-DexHand-v0 is not a registered gym id (skeleton)
     )
 
     @property

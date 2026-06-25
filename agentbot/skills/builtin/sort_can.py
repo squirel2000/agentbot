@@ -23,7 +23,9 @@ class SortCanSkill(Skill):
         params=[
             SkillParamSpec(
                 name="target_color", type="enum", enum=["orange", "green"],
-                description="Which colored plate to place the can on.", required=True,
+                description="Which colored plate to place the can on. Omit it for a bare "
+                            "'sort can' — the Brain fills it from the can on the table.",
+                required=False,
             ),
         ],
         preconditions=["arm_idle", "can_visible"],
@@ -36,7 +38,9 @@ class SortCanSkill(Skill):
         return self._spec
 
     def to_vla_request(self, call: SkillCall, ctx: dict[str, Any]) -> VlaTaskRequest:
-        color = call.args["target_color"]
+        # Color precedence: explicit call arg -> scene color injected via ctx -> "orange".
+        # sim_session re-syncs to the env's actual target anyway, so this only sets the prompt.
+        color = call.args.get("target_color") or ctx.get("target_color") or "orange"
         return VlaTaskRequest(
             skill_call_id=call.skill_call_id,
             embodiment=ctx.get("embodiment", Embodiment.SIM),

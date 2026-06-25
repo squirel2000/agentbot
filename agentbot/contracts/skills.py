@@ -32,6 +32,7 @@ class SkillSpec(BaseModel):
     preconditions: list[str] = Field(default_factory=list)
     postconditions: list[str] = Field(default_factory=list)
     embodiments: list[Embodiment] = Field(default_factory=lambda: [Embodiment.SIM])
+    sim_runnable: bool = True  # False = skeleton skill with no registered IsaacLab gym id; orchestrator skips it
 
     def to_tool_schema(self) -> dict:
         """Export as an LLM tool schema (Anthropic/OpenAI ``input_schema`` shape)."""

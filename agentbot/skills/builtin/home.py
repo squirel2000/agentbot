@@ -28,6 +28,7 @@ class HomeSkill(Skill):
         preconditions=[],
         postconditions=["arm_idle", "arm_at_home"],
         embodiments=[Embodiment.SIM],
+        sim_runnable=False,  # Isaac-Home-OpenArm-DexHand-v0 is not a registered gym id (skeleton)
     )
 
     @property

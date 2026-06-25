@@ -33,6 +33,7 @@ class PickSkill(Skill):
         preconditions=["arm_idle", "object_visible"],
         postconditions=["object_grasped"],
         embodiments=[Embodiment.SIM],
+        sim_runnable=False,  # Isaac-Pick-OpenArm-DexHand-v0 is not a registered gym id (skeleton)
     )
 
     @property

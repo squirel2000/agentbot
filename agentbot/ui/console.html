@@ -45,8 +45,14 @@ select,input{background:var(--bg);color:var(--text);border:1px solid var(--borde
 .subtree.open{display:block}
 .subtree .item{font-size:12.5px;padding:5px 10px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+/* status on an ANCESTOR (command rows, badges): `.status .dot` */
 .queued .dot{background:var(--warn)} .running .dot{background:var(--accent);animation:pulse 1.1s infinite}
 .done .dot,.succeeded .dot{background:var(--ok)} .failed .dot,.cleared .dot{background:var(--bad)}
+.skipped .dot{background:var(--muted)} .timeout .dot{background:var(--warn)}
+/* status on the DOT itself (skill-run timeline rows): `.dot.status` */
+.dot.queued{background:var(--warn)} .dot.running{background:var(--accent);animation:pulse 1.1s infinite}
+.dot.done,.dot.succeeded{background:var(--ok)} .dot.failed,.dot.cleared,.dot.unknown_skill{background:var(--bad)}
+.dot.skipped{background:var(--muted)} .dot.timeout{background:var(--warn)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 /* main */
 .main{overflow:auto;padding:18px 22px;min-width:0}
@@ -86,11 +92,13 @@ window.__toggle=function(){t=t==='dark'?'light':'dark';document.documentElement.
     <div class="brand"><span class="blip"></span>AgentBot · Dashboard</div>
     <span class="pill" id="connpill">events: …</span>
     <span class="pill" id="statepill">idle</span>
+    <span class="pill" id="scenepill" title="env target plate (live from sim_session)" style="display:none"></span>
     <div class="spacer"></div>
     <div class="ctl">
       <select id="ckpt" title="checkpoint (swappable)"></select>
+      <button class="btn" onclick="resetEnv()" title="Reset the sim scene (re-randomize the can/target plate)">↺ Reset env</button>
       <button class="btn warn" onclick="clearQueue()" title="Delete pending commands">✕ Clear queue</button>
-      <button class="btn bad" onclick="stopOrch()" title="Stop orchestrator + clear queue">■ Stop</button>
+      <button class="btn bad" onclick="stopOrch()" title="Stop &amp; recover: cancel current, drain command + VLA queues, clear blocked state (loop stays alive)">■ Stop</button>
       <button class="btn estop" onclick="estop()" title="Emergency stop (trips SafetyWatchdog)">⛔ E-STOP</button>
       <button class="btn" onclick="window.__toggle()">◐</button>
       <button class="btn" onclick="document.querySelector('.body').classList.toggle('collapsed')" title="toggle sidebar">☰</button>
@@ -114,7 +122,7 @@ window.__toggle=function(){t=t==='dark'?'light':'dark';document.documentElement.
       </ul>
       <div class="navh">New command</div>
       <div style="padding:0 6px">
-        <textarea id="cmdbox" rows="2" style="width:100%;resize:vertical" placeholder="e.g. sort the can onto the orange plate"></textarea>
+        <textarea id="cmdbox" rows="2" style="width:100%;resize:vertical" placeholder="e.g. sort can   (auto-picks the plate by the can's color) — or: sort the can onto the green plate"></textarea>
         <button class="btn" style="width:100%;margin-top:6px;border-color:var(--accent)" onclick="postCommand()">▸ Enqueue</button>
         <div class="muted" style="font-size:11px;margin-top:6px">Enqueued immediately; the Brain runs it async.</div>
       </div>
@@ -166,6 +174,9 @@ async function poll(){
   const running=CMDS.find(c=>c.status==='running');
   $('#statepill').textContent=running?'running · '+(running.text.slice(0,24)):'idle / waiting';
   $('#statepill').className='pill '+(running?'running':'');
+  const tc=(STATE.environment||{}).target_color;
+  $('#scenepill').textContent=tc?('🎯 target: '+tc+' plate'):'';
+  $('#scenepill').style.display=tc?'':'none';
   if(VIEW==='system'||VIEW==='monitor'||VIEW==='stats'||(VIEW==='commands'&&!SELCMD))render();
 }
 setInterval(poll,1500);
@@ -288,6 +299,7 @@ async function postCommand(){const t=$('#cmdbox').value.trim();if(!t)return;$('#
   await jpost('/v1/commands',{session_id:SID,text:t});poll();
   if($('#cmdcaret'))$('#cmdcaret').classList.add('open'),$('#cmdtree').classList.add('open');}
 async function clearQueue(){const r=await jdel('/v1/commands');poll();}
+async function resetEnv(){await jpost('/v1/control/reset');poll();}
 async function stopOrch(){await jpost('/v1/control/stop');poll();}
 async function estop(){if(confirm('Emergency stop — trip the SafetyWatchdog?'))await jpost('/v1/control/estop');}
 $('#cmdbox').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))postCommand();});
