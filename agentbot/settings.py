@@ -34,6 +34,7 @@ class RedisCfg(BaseModel):
     events_stream: str = "agentbot:events"
     tasks_queue: str = "agentbot:vla:tasks"
     state_hash: str = "agentbot:state"
+    abort_key: str = "agentbot:vla:abort"
 
 
 class VectorCfg(BaseModel):

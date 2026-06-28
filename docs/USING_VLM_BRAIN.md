@@ -127,12 +127,13 @@ Monitor `state["camera"]["frame"]` (publish it from `sim_session` — see `DELIV
 - **■ Stop** (`POST /v1/control/stop`) → **recoverable**: cancels the in-flight command, drains BOTH
   the command queue and the VLA-task queue (`agentbot:vla:tasks`), and clears a SAFETY-blocked
   `robot_state`. It does **not** kill the orchestrator loop, so you can enqueue again immediately.
-  (An already-running sim episode finishes — ~30 s — before the cancel takes effect; aborting
-  mid-episode is a follow-up.)
+  It also **aborts the episode already running** in `sim_session` (cooperative abort, polled once per
+  action chunk → the episode ends within ~1–2 s with status `aborted`) — no need to wait for it.
 - **⛔ E-STOP** trips the `SafetyWatchdog` (`robot_state → blocked`); press **■ Stop** or **↺ Reset env**
   to clear the blocked state and resume.
 - **Type just `sort can`** → the Brain fills the plate color from the can on the table (the env's
-  randomized target, published to `state['environment']`). An explicit "…green/orange plate" always wins.
+  randomized target, published to `state['environment']`). An explicit "…green/orange plate" always wins
+  (and pins the env's target to that color — see below).
 
 ## Troubleshooting
 - **A command does nothing / no action after Enqueue** → the orchestrator loop was halted by an
@@ -143,8 +144,10 @@ Monitor `state["camera"]["frame"]` (publish it from `sim_session` — see `DELIV
   color mismatch, not a Monitor bug. The Can-Sorting env randomizes the target plate each reset and
   `task_done` judges success against *that* basket; `sim_session` now syncs the policy instruction
   to the env's actual target (`obs['scene_obs']['target_object_color']`, {0:orange,1:green}).
-  **Limitation:** the *commanded* color is overridden by the env's random one — honoring the exact
-  commanded color requires setting the env target on reset (a follow-up).
+  An **explicit** commanded color is honored at the source too: `set_force_target()` pins the env's
+  reset target to that color's can (carb `/pickplace_env/force_target_object`) *before* reset, so the
+  env target == the command (the instruction sync above then confirms it). **↺ Reset env** clears the
+  pin → fresh random target, which a bare "sort can" tracks.
 - **Plans look like keyword guesses** → the VLM endpoint is down/misconfigured; `Gr00tVLMClient`
   fell back to the stub. Check `vlm.base_url` and that the VLM server's `/health` is `ok`.
 - **`OMNI_KIT_ACCEPT_EULA`** must be `YES` for headless isaacsim/isaaclab.

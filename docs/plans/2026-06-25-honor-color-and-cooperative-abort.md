@@ -118,7 +118,6 @@ sim_session sets carb /pickplace_env/force_target_object so the env's reset pick
 making the commanded color the actual target (terminations.py checks the matching basket).
 """
 import importlib.util
-from pathlib import Path
 
 # sim_session.py imports isaaclab at module top (env_isaaclab only); load just the helper by
 # exec'ing the function's source is brittle, so import lazily and skip if isaaclab is absent.

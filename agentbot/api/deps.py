@@ -20,6 +20,7 @@ from agentbot.brain.orchestrator import Orchestrator
 from agentbot.contracts.common import Embodiment
 from agentbot.contracts.events import Event
 from agentbot.contracts.skills import SkillCall
+from agentbot.monitor.abort import AbortFlag, InMemAbortFlag, RedisAbortFlag
 from agentbot.monitor.command_queue import InMemCommandQueue, RedisCommandQueue
 from agentbot.monitor.event_bus import EventBus, InProcEventBus, RedisEventBus
 from agentbot.monitor.ingest import Ingestor
@@ -53,6 +54,11 @@ class Deps:
             self.command_queue = RedisCommandQueue(cfg.redis.url)
         else:
             self.command_queue = InMemCommandQueue()
+
+        if cfg.backbone == "redis":
+            self.abort: AbortFlag = RedisAbortFlag(cfg.redis.url, cfg.redis.abort_key)
+        else:
+            self.abort = InMemAbortFlag()
 
         self.registry = SkillRegistry()
         self.registry.register(SortCanSkill())

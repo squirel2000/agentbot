@@ -100,6 +100,27 @@ def run_stabilization(env, idle_actions):
     return obs
 
 
+FORCE_TARGET_SETTING = "/pickplace_env/force_target_object"
+COLOR_TO_CAN = {"orange": "red_can", "green": "blue_can"}
+
+
+def force_can_for_color(color):
+    """Instruction color -> the can asset task_done checks ('orange'->red_can, 'green'->blue_can),
+    or None for unknown. Mirrors target_object_color {0: red_can/orange, 1: blue_can/green}."""
+    return COLOR_TO_CAN.get((color or "").lower())
+
+
+def set_force_target(color) -> None:
+    """Pin the env's next reset target to *color*'s can (so the commanded color becomes the
+    actual target). Unknown color clears the pin (-> random)."""
+    _carb.set_string(FORCE_TARGET_SETTING, force_can_for_color(color) or "")
+
+
+def clear_force_target() -> None:
+    """Release the pin so the env re-randomizes its target on reset."""
+    _carb.set_string(FORCE_TARGET_SETTING, "")
+
+
 def _scene_target_color(obs):
     """The env's current randomized target plate color ('orange'|'green'), or None.
 
@@ -148,7 +169,7 @@ def build_env(task_name: str):
     return env, mapper, idle, task_done
 
 
-def run_skill(env, mapper, idle, task_done, client, req: VlaTaskRequest, publish) -> VlaTaskResult:
+def run_skill(env, mapper, idle, task_done, client, req: VlaTaskRequest, publish, abort=None) -> VlaTaskResult:
     """Run ONE episode for *req* in the live env; publish telemetry + return the result.
 
     Inner obs->action->step loop is lifted verbatim from gr00t_infer_agent.py (~282-345)."""
@@ -157,6 +178,7 @@ def run_skill(env, mapper, idle, task_done, client, req: VlaTaskRequest, publish
     cam_keys = [CAMERA_OBS[c] for c in cameras]
     filt = LowPassFilter(alpha=0.3)
     success = terminated = truncated = False
+    aborted = False
     steps = 0
     t0 = time.time()
 
@@ -164,6 +186,12 @@ def run_skill(env, mapper, idle, task_done, client, req: VlaTaskRequest, publish
     # gr00t_infer_agent.py — otherwise env.reset() between skills hits "inplace update to
     # inference tensor outside InferenceMode" on tensors the previous skill's steps created.
     with torch.inference_mode():
+        if abort is not None:
+            abort.clear()               # stale abort from a previous skill must not kill this one
+        # Honor the commanded color: pin the env's target to this color's can BEFORE reset, so
+        # the randomized target == the command (task_done then checks the right basket). The
+        # color-sync below becomes a no-op when they already match; it stays as a safety net.
+        set_force_target(req.params.get("target_color"))
         obs, _ = env.reset()
         obs = run_stabilization(env, idle)
         publish(_status_event(req, "running", task_name=req.task_name, instruction=req.instruction))
@@ -174,8 +202,10 @@ def run_skill(env, mapper, idle, task_done, client, req: VlaTaskRequest, publish
         # the wrong plate, task_done is never True, and the orchestrator retries/replans
         # forever (the "action repeats / always failed though it completed" symptom).
         # This mirrors gr00t_infer_agent.py --multitask (TARGET_COLOR_ID_TO_NAME {0:orange,1:green}).
-        # NOTE: this means the *commanded* color is overridden by the env's random one; honoring
-        # the exact commanded color would require setting the env target on reset (a follow-up).
+        # set_force_target() above already pinned the env target to the commanded color (when one was
+        # given), so env target == command and this sync just confirms it. When no color was forced
+        # (e.g. after ↺ Reset env → random target), it reads the actual target and drives the policy
+        # to it. Either way the instruction matches the basket task_done checks.
         color = _scene_target_color(obs)
         if color:
             publish(Event(type=EventType.ENVIRONMENT, source="vla.sim_session",
@@ -215,12 +245,22 @@ def run_skill(env, mapper, idle, task_done, client, req: VlaTaskRequest, publish
 
             publish(_telemetry_event(req, VlaTelemetry(task_id=req.task_id, step=steps,
                                                        inference_latency_s=lat, success=success)))
+            if abort is not None and abort.tripped(req.task_id):
+                aborted = True
+                print(f"[sim_session] abort requested; ending episode at step {steps}", flush=True)
+                break
             if terminated or truncated or success:
                 break
 
+    if aborted:
+        status = VlaTaskStatus.ABORTED
+    elif success:
+        status = VlaTaskStatus.SUCCEEDED
+    else:
+        status = VlaTaskStatus.FAILED
     result = VlaTaskResult(
         task_id=req.task_id,
-        status=VlaTaskStatus.SUCCEEDED if success else VlaTaskStatus.FAILED,
+        status=status,
         episodes=1, success=1 if success else 0, success_rate=1.0 if success else 0.0,
         steps=steps, duration_s=round(time.time() - t0, 2),
     )
@@ -281,12 +321,16 @@ def _serve(cfg) -> None:
         r.xadd(stream, {"json": ev.model_dump_json()})
 
     client = _make_client(cfg)
+    from agentbot.monitor.abort import RedisAbortFlag
+    abort = RedisAbortFlag(cfg.redis.url, cfg.redis.abort_key)
+    abort.clear()                         # startup: clear any stale abort
     current_task = args_cli.task or cfg.vla.default_task
     env, mapper, idle, task_done = build_env(current_task)
 
     # Reset once at startup so the dashboard shows a fresh scene + target color immediately
     # (and so the idle keepalive steps an initialized env, not an un-reset one).
     with torch.inference_mode():
+        clear_force_target()           # startup scene is freshly random
         obs, _ = env.reset()
         obs = run_stabilization(env, idle)
     publish_scene(obs, publish, current_task)
@@ -321,12 +365,14 @@ def _serve(cfg) -> None:
             # no policy episode is run.
             print(f"[sim_session] reset scene (task={current_task})", flush=True)
             with torch.inference_mode():
+                clear_force_target()   # ↺ Reset env => fresh random target
                 obs, _ = env.reset()
                 obs = run_stabilization(env, idle)
             publish_scene(obs, publish, current_task)
             last_scene_pub = time.time()
             continue
-        run_skill(env, mapper, idle, task_done, client, req, publish)
+        run_skill(env, mapper, idle, task_done, client, req, publish, abort=abort)
+        abort.clear()                     # done/aborted -> release so the next skill runs
         last_scene_pub = time.time()
         n += 1
         if args_cli.max_skills and n >= args_cli.max_skills:

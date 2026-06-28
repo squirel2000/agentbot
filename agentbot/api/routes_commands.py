@@ -70,6 +70,8 @@ async def control_stop(d: Deps = Depends(get_deps)) -> dict:
     #   2) drain both queues — pending commands AND pending VLA tasks (`agentbot:vla:tasks`),
     #   3) clear the safety-blocked robot_state so the system is usable again after an E-STOP.
     d.orchestrator.cancel_current()
+    d.abort.trip()                       # broadcast ("all") abort: ends whatever episode is running;
+    #                                      the next skill's clear-at-start prevents bleed-through.
     cleared_commands = d.command_queue.clear()
     cleared_vla_tasks = d.queue.clear()
     d.state.set_state("robot_state", {"mode": "idle", "detail": "stopped"})

@@ -98,7 +98,7 @@ window.__toggle=function(){t=t==='dark'?'light':'dark';document.documentElement.
       <select id="ckpt" title="checkpoint (swappable)"></select>
       <button class="btn" onclick="resetEnv()" title="Reset the sim scene (re-randomize the can/target plate)">↺ Reset env</button>
       <button class="btn warn" onclick="clearQueue()" title="Delete pending commands">✕ Clear queue</button>
-      <button class="btn bad" onclick="stopOrch()" title="Stop &amp; recover: cancel current, drain command + VLA queues, clear blocked state (loop stays alive)">■ Stop</button>
+      <button class="btn bad" onclick="stopOrch()" title="Stop &amp; recover: cancel current, abort the running episode, drain command + VLA queues, clear blocked state (loop stays alive)">■ Stop</button>
       <button class="btn estop" onclick="estop()" title="Emergency stop (trips SafetyWatchdog)">⛔ E-STOP</button>
       <button class="btn" onclick="window.__toggle()">◐</button>
       <button class="btn" onclick="document.querySelector('.body').classList.toggle('collapsed')" title="toggle sidebar">☰</button>
