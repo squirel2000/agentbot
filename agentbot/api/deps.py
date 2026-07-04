@@ -29,7 +29,7 @@ from agentbot.monitor.results import ResultWaiter
 from agentbot.monitor.safety import SafetyWatchdog
 from agentbot.monitor.state_store import InMemStateStore, RedisStateStore, StateStore
 from agentbot.records.store import Records
-from agentbot.settings import AppConfig, REPO_ROOT, load_config
+from agentbot.settings import AGENTBOT_DIR, AppConfig, load_config
 from agentbot.skills.builtin.home import HomeSkill
 from agentbot.skills.builtin.pick import PickSkill
 from agentbot.skills.builtin.place import PlaceSkill
@@ -68,10 +68,11 @@ class Deps:
         self.registry.register(PlaceSkill())
         self.registry.register(HomeSkill())
 
-        # Resolve the sqlite path absolute (under REPO_ROOT if relative) so the DBs land in
-        # the same place regardless of the process's cwd (API vs sim_session vs tests).
+        # Resolve the sqlite path absolute (under the agentbot repo dir if relative) so the
+        # DBs travel with the repo and land in the same place regardless of the process's
+        # cwd (API vs sim_session vs tests) or where the repo sits in the workspace.
         db = Path(cfg.memory.sqlite_path)
-        db = db if db.is_absolute() else REPO_ROOT / db
+        db = db if db.is_absolute() else AGENTBOT_DIR / db
         store = MemoryStore(str(db))
         self.conversation = ConversationMemory(store)
         self.episodic = EpisodicMemory(store)

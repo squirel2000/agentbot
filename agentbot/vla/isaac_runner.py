@@ -2,8 +2,8 @@
 
 MVP strategy (Phase 1): rather than re-implement IsaacLab's delicate import-time app
 launch in-process, ``run_rollout`` drives the **proven** eval agent
-``scripts/eval/gr00t_infer_agent.py`` for ONE episode and streams/parses its output.
-This is exactly "block 5 reuses scripts/eval" — battle-tested, low-risk. (A persistent
+``agents/evalbot/harness/gr00t_infer_agent.py`` for ONE episode and streams/parses its output.
+This is exactly "block 5 reuses the eval harness" — battle-tested, low-risk. (A persistent
 in-process sim is a Phase-2 optimization.)
 
 It replicates ``run_eval.py``'s client invocation:
@@ -40,10 +40,17 @@ _FIN = re.compile(r"Episode\s+\d+\s+finished.*?Success:\s+(True|False).*?Termina
 _BACKEND_CFG = {"N1.7": "gr00t_n17_openarm_o6", "N1.6": "gr00t_n16_openarm_o6", "N1.5": "gr00t_n15_openarm_o6"}
 
 
+def eval_harness_dir(cfg=None):
+    """The eval harness dir (gr00t_infer_agent.py, configs/, utils/) — location is
+    config-driven (``vla.eval_harness``, workspace-root relative), never hardcoded."""
+    cfg = cfg or load_config()
+    return (REPO_ROOT / cfg.vla.eval_harness).resolve()
+
+
 def backend_spec(gr00t_ver: str) -> dict:
     """Read the eval backend-config JSON so the worker and eval harness stay consistent."""
     name = _BACKEND_CFG.get(gr00t_ver, "gr00t_n17_openarm_o6")
-    p = REPO_ROOT / "scripts" / "eval" / "configs" / f"{name}.json"
+    p = eval_harness_dir() / "configs" / f"{name}.json"
     return json.loads(p.read_text()) if p.exists() else {"host": "localhost", "port": 5555}
 
 
@@ -57,7 +64,7 @@ class Runner(Protocol):
 
 
 def run_rollout(req: VlaTaskRequest, publish: Publish) -> VlaTaskResult:
-    """Run ONE IsaacLab episode for *req* by driving scripts/eval/gr00t_infer_agent.py.
+    """Run ONE IsaacLab episode for *req* by driving agents/evalbot/harness/gr00t_infer_agent.py.
 
     Assumes the GR00T policy server is already up on the backend's host:port (SimBackend
     ensures this) and that this process runs in env_isaaclab (IsaacLab importable).
@@ -65,8 +72,9 @@ def run_rollout(req: VlaTaskRequest, publish: Publish) -> VlaTaskResult:
     cfg = load_config()
     spec = backend_spec(req.gr00t_ver)
     isaaclab = (REPO_ROOT / cfg.vla.isaaclab_repo).resolve()
-    agent = REPO_ROOT / "scripts" / "eval" / "gr00t_infer_agent.py"
-    policy_config = REPO_ROOT / "scripts" / "eval" / "configs" / f"{_BACKEND_CFG.get(req.gr00t_ver)}.json"
+    harness = eval_harness_dir(cfg)
+    agent = harness / "gr00t_infer_agent.py"
+    policy_config = harness / "configs" / f"{_BACKEND_CFG.get(req.gr00t_ver)}.json"
     host = spec.get("host", "localhost")
     port = str(spec.get("port", 5555))
     opts = req.options or {}

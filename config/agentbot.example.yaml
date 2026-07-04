@@ -32,19 +32,21 @@ redis:
   # Note: the command queue uses key  agentbot:commands  (UI → orchestrator, FIFO).
 
 # Block 2 memory + the task-management records (always SQLite; relative paths resolve
-# under the repo root, so they're cwd-independent).
+# under the agentbot repo dir, so they're cwd-independent and travel with the repo).
 memory:
-  sqlite_path: agentbot/var/agentbot.db   # conversation + episodic memory; records.db is a sibling
+  sqlite_path: var/agentbot.db   # conversation + episodic memory; records.db is a sibling
   vector:
     backend: chroma           # chroma | none  (long-term semantic RAG; optional, Phase 2c)
-    path: agentbot/var/chroma
+    path: var/chroma
 
 # Block 5 — the VLA execution engine (GR00T running in IsaacLab).
 vla:
   embodiment: sim             # sim | hardware (hardware = future, via openarm_ros2)
   gr00t_ver: N1.7             # selects the eval backend config + client wire format
-  isaaclab_repo: IsaacLab     # path (relative to repo root) to the IsaacLab checkout
+  isaaclab_repo: engines/sim/IsaacLab   # path (relative to the workspace root) to the IsaacLab checkout
   isaaclab_conda_env: env_isaaclab
+  eval_harness: agents/evalbot/harness  # eval harness dir (gr00t_infer_agent.py +
+                              # configs/ + utils/), workspace-root relative
   default_task: Isaac-Can-Sorting-OpenArm-DexHand-v0   # the gym task the sim_session loads
   options: { headless: true, save_video: true, filter: true }   # per-episode run options
 
@@ -60,3 +62,16 @@ vla:
 api:
   host: 0.0.0.0
   port: 8780
+
+# The sim-stack supervisor (`python -m agentbot.stack up|status|down|logs`) —
+# agentbot wakes + monitors the whole cross-repo stack (redis, VLM Brain :8000,
+# GR00T policy :5555, IsaacLab sim_session, dashboard :8780). Paths are
+# workspace-root relative; BRAIN_MODEL / GR00T_CKPT env vars override per run.
+stack:
+  brain_model: artifacts/checkpoints/gr00t/lora_tuned_vlm_toolcall/Cosmos-Reason2-2B-toolcall-merged
+  gr00t_checkpoint: artifacts/checkpoints/gr00t/N1_7_fft_0614_150k_lr5e5_no_tune_visual/checkpoint-150000
+  headless: false             # windowed by default; `up --headless` overrides
+  conda_sh: ~/miniforge3/etc/profile.d/conda.sh
+  vlm_port: 8000
+  gr00t_port: 5555
+  dashboard_port: 8780

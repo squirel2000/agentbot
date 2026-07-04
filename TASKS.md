@@ -33,7 +33,7 @@
 
 1. **先把 Phase 0 跑一遍、熟悉它**（不需要 GPU）：
    ```bash
-   cd agentbot && uv sync && uv run pytest -q          # 23 passed
+   cd agents/agentbot && uv sync && uv run pytest -q          # 23 passed
    uv run uvicorn agentbot.api.app:app --port 8780     # 開 http://localhost:8780，在 Chat 輸入「sort the can onto orange」
    ```
    你會看到：指令 → 結構化 plan → 派工到（假的）VLA → Console 即時顯示遙測。這就是整條 1·2·4·5+3。
@@ -44,7 +44,7 @@
    - **請你順手確認的 4 個 runtime 事實**（只有實機/實跑才知道）：
      - [ ] `pour_water` 在 IsaacLab 的實際 gym id（`sort_can` 已知為 `Isaac-Can-Sorting-OpenArm-DexHand-v0`）
      - [ ] 多工（顏色）觀測的實際 key（目前 eval 用 `obs["scene_obs"]["target_object_color"]`，0=orange / 1=green，確認仍正確）
-     - [ ] N1.7 client 連線是否需要 `client_pythonpath`（見 `scripts/eval/configs/gr00t_n17_openarm_o6.json`）
+     - [ ] N1.7 client 連線是否需要 `client_pythonpath`（見 `agents/evalbot/harness/configs/gr00t_n17_openarm_o6.json`）
      - [ ] 是否已在 `env_isaaclab` 裡 `pip install -e agentbot`（worker 要 import agentbot）
 
 3. 給我綠燈後，我就照下面 **Phase 1** 的清單開工。

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from agentbot.contracts.vla import VlaTaskRequest, VlaTaskResult
+from agentbot.settings import AGENTBOT_DIR
 from agentbot.vla.isaac_runner import Publish, run_rollout as real_run_rollout
 from agentbot.vla.policy_server import PolicyServer
 
@@ -31,7 +32,7 @@ class SimBackend:
         if self._server and self._server.health():
             return
         srv = PolicyServer(self.backend_spec, req.checkpoint, self.repo_root, self.conda_sh)
-        log_path = Path(self.repo_root) / "output" / "agentbot" / f"vla_server_{req.task_id}.log"
+        log_path = AGENTBOT_DIR / "var" / "logs" / f"vla_server_{req.task_id}.log"
         srv.start(str(log_path))
         if not srv.wait_ready():
             raise RuntimeError("GR00T policy server failed to become ready")

@@ -39,7 +39,7 @@ class PolicyServer:
         return self.backend.get("host", "localhost")
 
     def _workdir_activate(self) -> tuple[Path, str]:
-        workdir = self.repo_root / self.backend.get("server_repo", "Isaac-GR00T")
+        workdir = self.repo_root / self.backend.get("server_repo", "engines/vla/Isaac-GR00T")
         if self.backend.get("server_venv"):          # N1.7 uses a uv/.venv, not conda
             return workdir, f"source {shlex.quote(str(workdir / self.backend['server_venv']))}/bin/activate"
         env = self.backend.get("server_conda_env", "env_gr00t")

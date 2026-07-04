@@ -11,7 +11,13 @@
 #   conda activate env_isaaclab && bash agentbot/run_sim_session.sh
 set -u
 export OMNI_KIT_ACCEPT_EULA=YES
-ISAACLAB=${ISAACLAB:-/home/asus/Gits/IsaacLab-GR00T/IsaacLab}
+if [ -z "${ISAACLAB:-}" ]; then
+  # Workspace root discovery: walk up from this script until workspace.yaml.
+  _WS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  while [ "$_WS" != "/" ] && [ ! -f "$_WS/workspace.yaml" ]; do _WS="$(dirname "$_WS")"; done
+  source "$_WS/paths.env"
+  ISAACLAB="$WS_ISAACLAB"
+fi
 cd "$ISAACLAB"
 n=0
 while true; do

@@ -10,7 +10,7 @@ Run in env_isaaclab AFTER the GR00T server is up:
 No-Redis verification of the persistent loop (still needs the GR00T server + GPU):
     python -m agentbot.vla.sim_session --selftest
 
-This file refactors the OUTER loop of scripts/eval/gr00t_infer_agent.py into a
+This file refactors the OUTER loop of agents/evalbot/harness/gr00t_infer_agent.py into a
 command-driven loop; the per-chunk obs->action->step inner loop is lifted verbatim.
 AppLauncher MUST be constructed before importing gym/isaaclab (hard requirement).
 """
@@ -56,11 +56,11 @@ from agentbot.contracts.events import Event, EventType
 from agentbot.contracts.vla import VlaTaskRequest, VlaTaskResult, VlaTaskStatus, VlaTelemetry
 from agentbot.settings import REPO_ROOT, load_config
 from agentbot.vla.frame_encode import frame_to_datauri
-from agentbot.vla.isaac_runner import _telemetry_event, backend_spec
+from agentbot.vla.isaac_runner import _telemetry_event, backend_spec, eval_harness_dir
 from agentbot.vla.worker import _result_event, _status_event
 
 # eval utils (joint mapping / filter / GR00T client) — same proven code as the eval harness.
-sys.path.insert(0, str(REPO_ROOT / "scripts" / "eval"))
+sys.path.insert(0, str(eval_harness_dir()))
 from utils.filter import LowPassFilter           # noqa: E402
 from utils.gr00t_client_adapter import Gr00tClientAdapter  # noqa: E402
 from utils.joint_mapper import JointMapper       # noqa: E402

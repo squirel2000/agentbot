@@ -48,7 +48,7 @@ conda activate env_isaaclab && pip install -e agentbot \
 Then send commands from the dashboard (or `POST /v1/commands`). The orchestrator dispatches skills one at a time
 to the always-open IsaacLab session; the Monitor confirms each before the next.
 
-No GPU? Smoke-test the worker path: `cd agentbot && uv run python -m agentbot.vla.sim_session --selftest` (needs a GR00T server) or the in-proc demo (A).
+No GPU? Smoke-test the worker path: `cd agents/agentbot && uv run python -m agentbot.vla.sim_session --selftest` (needs a GR00T server) or the in-proc demo (A).
 
 ---
 
